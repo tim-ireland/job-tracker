@@ -1,0 +1,564 @@
+const API_BASE = '/api';
+let companies = [];
+let applications = [];
+let currentApplication = null;
+let sortColumn = null;
+let sortDirection = 'asc';
+let showClosedApps = false;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    loadDashboard();
+    await loadCompanies();
+    loadApplications();
+    setupEventListeners();
+    setupModalClickOutside();
+    setupSortableHeaders();
+});
+
+function setupEventListeners() {
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            const target = e.target.dataset.tab;
+            switchTab(target);
+        });
+    });
+
+    document.getElementById('addApplicationBtn').addEventListener('click', () => openApplicationModal());
+    document.getElementById('addCompanyBtn').addEventListener('click', () => openCompanyModal());
+    document.getElementById('importJobsBtn').addEventListener('click', () => openImportJobsModal());
+    document.getElementById('applicationForm').addEventListener('submit', handleApplicationSubmit);
+    document.getElementById('companyForm').addEventListener('submit', handleCompanySubmit);
+    document.getElementById('importJobsForm').addEventListener('submit', handleImportJobs);
+    
+    // Show/hide closed applications toggle
+    document.getElementById('showClosedApps').addEventListener('change', (e) => {
+        showClosedApps = e.target.checked;
+        updateApplicationList();
+    });
+
+    document.querySelectorAll('.close-modal').forEach(btn => {
+        btn.addEventListener('click', () => {
+            closeModal(btn.closest('.modal').id);
+        });
+    });
+}
+
+function setupModalClickOutside() {
+    // Close modal when clicking on the backdrop (outside modal content)
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal(modal.id);
+            }
+        });
+    });
+}
+
+function setupSortableHeaders() {
+    document.querySelectorAll('th.sortable').forEach(header => {
+        header.addEventListener('click', () => {
+            const column = header.dataset.sort;
+            
+            // Toggle direction if clicking same column
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'asc';
+            }
+            
+            // Update sort icons
+            document.querySelectorAll('th.sortable .sort-icon').forEach(icon => {
+                icon.className = 'fas fa-sort sort-icon';
+            });
+            
+            const icon = header.querySelector('.sort-icon');
+            icon.className = sortDirection === 'asc' 
+                ? 'fas fa-sort-up sort-icon' 
+                : 'fas fa-sort-down sort-icon';
+            
+            sortApplications();
+        });
+    });
+}
+
+function sortApplications() {
+    if (!sortColumn) return;
+    
+    applications.sort((a, b) => {
+        let aVal, bVal;
+        
+        switch(sortColumn) {
+            case 'company':
+                const companyA = companies.find(c => c.id === a.company_id);
+                const companyB = companies.find(c => c.id === b.company_id);
+                aVal = companyA ? companyA.name.toLowerCase() : '';
+                bVal = companyB ? companyB.name.toLowerCase() : '';
+                break;
+            case 'role':
+                aVal = a.role.toLowerCase();
+                bVal = b.role.toLowerCase();
+                break;
+            case 'priority':
+                // P1 < P2 < P3 < P4
+                aVal = parseInt(a.priority.replace('P', ''));
+                bVal = parseInt(b.priority.replace('P', ''));
+                break;
+            case 'status':
+                aVal = a.status.toLowerCase();
+                bVal = b.status.toLowerCase();
+                break;
+            case 'salary':
+                aVal = a.salary_range || '';
+                bVal = b.salary_range || '';
+                break;
+            case 'date':
+                aVal = a.date_applied ? new Date(a.date_applied).getTime() : 0;
+                bVal = b.date_applied ? new Date(b.date_applied).getTime() : 0;
+                break;
+            default:
+                return 0;
+        }
+        
+        if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+    
+    updateApplicationList();
+}
+
+function switchTab(tabName) {
+    document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    document.getElementById(`${tabName}Tab`).classList.add('active');
+}
+
+async function loadDashboard() {
+    try {
+        const response = await fetch(`${API_BASE}/dashboard`);
+        const data = await response.json();
+        document.getElementById('totalApps').textContent = data.total_applications;
+        document.getElementById('screeningApps').textContent = data.by_status.Screening || 0;
+        document.getElementById('interviews').textContent = data.by_status.Interview || 0;
+        document.getElementById('offers').textContent = data.by_status.Offer || 0;
+        document.getElementById('rejected').textContent = data.by_status.Rejected || 0;
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+    }
+}
+
+async function loadCompanies() {
+    try {
+        const response = await fetch(`${API_BASE}/companies`);
+        companies = await response.json();
+        updateCompanyList();
+        updateCompanySelect();
+    } catch (error) {
+        console.error('Error loading companies:', error);
+    }
+}
+
+function updateCompanyList() {
+    const tbody = document.getElementById('companyTableBody');
+    if (companies.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4">No companies yet</td></tr>';
+        return;
+    }
+    tbody.innerHTML = companies.map(company => `
+        <tr>
+            <td><strong>${escapeHtml(company.name)}</strong></td>
+            <td>${company.size || '-'}</td>
+            <td>${company.tech_stack || '-'}</td>
+            <td>
+                <button class="btn btn-secondary btn-sm" onclick="editCompany(${company.id})">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="deleteCompany(${company.id})">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function updateCompanySelect() {
+    const select = document.getElementById('companyId');
+    select.innerHTML = '<option value="">Select Company...</option>' +
+        companies.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+}
+
+async function loadApplications() {
+    try {
+        const response = await fetch(`${API_BASE}/applications`);
+        applications = await response.json();
+        updateApplicationList();
+    } catch (error) {
+        console.error('Error loading applications:', error);
+    }
+}
+
+function updateApplicationList() {
+    const tbody = document.getElementById('applicationTableBody');
+    
+    // Filter applications based on showClosedApps toggle
+    const closedStatuses = ['Rejected', 'Withdrawn', 'Accepted'];
+    const filteredApps = showClosedApps 
+        ? applications 
+        : applications.filter(app => !closedStatuses.includes(app.status));
+    
+    if (filteredApps.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7">No applications to display</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = filteredApps.map(app => {
+        const company = companies.find(c => c.id === app.company_id);
+        const companyName = company ? company.name : 'Unknown';
+        return `
+            <tr onclick="viewApplication(${app.id})" style="cursor: pointer;">
+                <td><strong>${escapeHtml(companyName)}</strong></td>
+                <td>${escapeHtml(app.role)}</td>
+                <td><span class="badge badge-${app.priority.toLowerCase()}">${app.priority}</span></td>
+                <td><span class="badge badge-${app.status.toLowerCase()}">${app.status}</span></td>
+                <td>${app.salary_range ? escapeHtml(app.salary_range) : '-'}</td>
+                <td>${app.date_applied ? new Date(app.date_applied).toLocaleDateString() : '-'}</td>
+                <td onclick="event.stopPropagation()">
+                    <button class="btn btn-secondary btn-sm" onclick="editApplication(${app.id})">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteApplication(${app.id})">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function openApplicationModal(applicationId = null, viewOnly = false) {
+    currentApplication = applicationId;
+    const modal = document.getElementById('applicationModal');
+    const form = document.getElementById('applicationForm');
+    const modalTitle = document.querySelector('#applicationModal .modal-header h2');
+    const submitBtn = document.querySelector('#applicationModal button[type="submit"]');
+    const pdfSection = document.getElementById('pdfFilesSection');
+    
+    // Update modal title
+    if (viewOnly) {
+        modalTitle.innerHTML = '<i class="fas fa-eye"></i> View Application';
+        submitBtn.style.display = 'none';
+    } else if (applicationId) {
+        modalTitle.innerHTML = '<i class="fas fa-edit"></i> Edit Application';
+        submitBtn.style.display = 'inline-flex';
+    } else {
+        modalTitle.innerHTML = '<i class="fas fa-plus"></i> Add Application';
+        submitBtn.style.display = 'inline-flex';
+    }
+    
+    if (applicationId) {
+        const app = applications.find(a => a.id === applicationId);
+        if (app) {
+            document.getElementById('companyId').value = app.company_id;
+            document.getElementById('role').value = app.role;
+            document.getElementById('priority').value = app.priority;
+            document.getElementById('status').value = app.status;
+            document.getElementById('jobUrl').value = app.job_url || '';
+            document.getElementById('resumeFilename').value = app.resume_filename || '';
+            document.getElementById('coverLetterFilename').value = app.cover_letter_filename || '';
+            document.getElementById('hiringManagerName').value = app.hiring_manager_name || '';
+            document.getElementById('hiringManagerEmail').value = app.hiring_manager_email || '';
+            document.getElementById('location').value = app.location || '';
+            document.getElementById('remotePolicy').value = app.remote_policy || '';
+            document.getElementById('salaryRange').value = app.salary_range || '';
+            document.getElementById('appNotes').value = app.notes || '';
+            
+            // Load PDF files
+            loadApplicationPDFs(applicationId);
+            pdfSection.style.display = 'block';
+        }
+        
+        // Disable all form inputs if view only
+        const inputs = form.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+            input.disabled = viewOnly;
+        });
+    } else {
+        form.reset();
+        pdfSection.style.display = 'none';
+        const inputs = form.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+            input.disabled = false;
+        });
+    }
+    
+    modal.classList.add('active');
+}
+
+function viewApplication(applicationId) {
+    openApplicationModal(applicationId, true);
+}
+
+function editApplication(applicationId) {
+    openApplicationModal(applicationId, false);
+}
+
+async function loadApplicationPDFs(applicationId) {
+    try {
+        const response = await fetch(`${API_BASE}/applications/${applicationId}/pdfs`);
+        const data = await response.json();
+        const pdfList = document.getElementById('pdfFilesList');
+        
+        if (data.pdfs && data.pdfs.length > 0) {
+            pdfList.innerHTML = data.pdfs.map(pdf => `
+                <div class="pdf-file-item">
+                    <i class="fas fa-file-pdf"></i>
+                    <a href="/api/files/pdf/${pdf.path}" target="_blank">${escapeHtml(pdf.name)}</a>
+                    <span class="pdf-file-size">${formatFileSize(pdf.size)}</span>
+                </div>
+            `).join('');
+        } else {
+            pdfList.innerHTML = '<p class="empty-state">No PDF files found in application directory</p>';
+        }
+    } catch (error) {
+        console.error('Error loading PDFs:', error);
+        document.getElementById('pdfFilesList').innerHTML = '<p class="empty-state">Error loading PDF files</p>';
+    }
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function openCompanyModal() {
+    const modal = document.getElementById('companyModal');
+    document.getElementById('companyForm').reset();
+    modal.classList.add('active');
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.remove('active');
+}
+
+function openModal(modalId) {
+    document.getElementById(modalId).classList.add('active');
+}
+
+let currentCompany = null;
+
+function openCompanyModal(companyId = null) {
+    currentCompany = companyId;
+    const modal = document.getElementById('companyModal');
+    const form = document.getElementById('companyForm');
+    
+    if (companyId) {
+        const company = companies.find(c => c.id === companyId);
+        if (company) {
+            document.getElementById('companyName').value = company.name;
+            document.getElementById('website').value = company.website || '';
+            document.getElementById('companySize').value = company.size || '';
+            document.getElementById('techStack').value = company.tech_stack || '';
+            document.getElementById('companyNotes').value = company.notes || '';
+        }
+        document.querySelector('#companyModal .modal-header h2').innerHTML = '<i class="fas fa-building"></i> Edit Company';
+    } else {
+        form.reset();
+        document.querySelector('#companyModal .modal-header h2').innerHTML = '<i class="fas fa-building"></i> Add Company';
+    }
+    
+    modal.classList.add('active');
+}
+
+async function handleApplicationSubmit(e) {
+    e.preventDefault();
+    
+    const data = {
+        company_id: parseInt(document.getElementById('companyId').value),
+        role: document.getElementById('role').value,
+        priority: document.getElementById('priority').value,
+        status: document.getElementById('status').value,
+        job_url: document.getElementById('jobUrl').value || null,
+        resume_filename: document.getElementById('resumeFilename').value || null,
+        cover_letter_filename: document.getElementById('coverLetterFilename').value || null,
+        hiring_manager_name: document.getElementById('hiringManagerName').value || null,
+        hiring_manager_email: document.getElementById('hiringManagerEmail').value || null,
+        location: document.getElementById('location').value || null,
+        remote_policy: document.getElementById('remotePolicy').value || null,
+        salary_range: document.getElementById('salaryRange').value || null,
+        notes: document.getElementById('appNotes').value || null
+    };
+    
+    try {
+        const url = currentApplication ? `${API_BASE}/applications/${currentApplication}` : `${API_BASE}/applications`;
+        const method = currentApplication ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            closeModal('applicationModal');
+            loadApplications();
+            loadDashboard();
+        }
+    } catch (error) {
+        console.error('Error saving application:', error);
+    }
+}
+
+async function handleCompanySubmit(e) {
+    e.preventDefault();
+    
+    const data = {
+        name: document.getElementById('companyName').value,
+        website: document.getElementById('website').value || null,
+        size: document.getElementById('companySize').value || null,
+        tech_stack: document.getElementById('techStack').value || null,
+        notes: document.getElementById('companyNotes').value || null
+    };
+    
+    try {
+        const url = currentCompany 
+            ? `${API_BASE}/companies/${currentCompany}`
+            : `${API_BASE}/companies`;
+        
+        const method = currentCompany ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            closeModal('companyModal');
+            loadCompanies();
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Error saving company');
+        }
+    } catch (error) {
+        console.error('Error saving company:', error);
+        alert('Error saving company');
+    }
+}
+
+function editCompany(id) {
+    openCompanyModal(id);
+}
+
+async function deleteApplication(id) {
+    if (!confirm('Delete this application?')) return;
+    
+    try {
+        await fetch(`${API_BASE}/applications/${id}`, { method: 'DELETE' });
+        loadApplications();
+        loadDashboard();
+    } catch (error) {
+        console.error('Error deleting application:', error);
+    }
+}
+
+async function deleteCompany(id) {
+    if (!confirm('Delete this company?')) return;
+    
+    try {
+        await fetch(`${API_BASE}/companies/${id}`, { method: 'DELETE' });
+        loadCompanies();
+        loadApplications();
+    } catch (error) {
+        console.error('Error deleting company:', error);
+    }
+}
+
+function openImportJobsModal() {
+    document.getElementById('jobUrls').value = '';
+    document.getElementById('importProgress').style.display = 'none';
+    document.getElementById('importResults').style.display = 'none';
+    openModal('importJobsModal');
+}
+
+async function handleImportJobs(e) {
+    e.preventDefault();
+    
+    const urls = document.getElementById('jobUrls').value;
+    const progressDiv = document.getElementById('importProgress');
+    const resultsDiv = document.getElementById('importResults');
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    
+    progressDiv.style.display = 'block';
+    resultsDiv.style.display = 'none';
+    submitBtn.disabled = true;
+    
+    try {
+        const response = await fetch(`${API_BASE}/jobs/import-urls`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ urls: urls })
+        });
+        
+        const result = await response.json();
+        
+        progressDiv.style.display = 'none';
+        resultsDiv.style.display = 'block';
+        
+        let html = '<div style="padding: 15px; background: var(--bg-primary); border-radius: 8px;">';
+        
+        if (result.success > 0) {
+            html += `<div style="color: var(--sol-green); margin-bottom: 10px;">
+                <i class="fas fa-check-circle"></i> Successfully imported ${result.success} job(s)
+            </div>`;
+            
+            html += '<div style="margin-top: 10px;"><strong>Imported Jobs:</strong><ul style="margin: 5px 0; padding-left: 20px;">';
+            result.created.forEach(job => {
+                html += `<li>${escapeHtml(job.company)} - ${escapeHtml(job.role)}</li>`;
+            });
+            html += '</ul></div>';
+        }
+        
+        if (result.failed > 0) {
+            html += `<div style="color: var(--sol-orange); margin-top: 15px;">
+                <i class="fas fa-exclamation-triangle"></i> ${result.failed} job(s) failed to import
+            </div>`;
+            
+            html += '<div style="margin-top: 10px;"><strong>Errors:</strong><ul style="margin: 5px 0; padding-left: 20px;">';
+            result.errors.forEach(err => {
+                html += `<li style="color: var(--sol-red); font-size: 0.9em;">${escapeHtml(err.error)}</li>`;
+            });
+            html += '</ul></div>';
+        }
+        
+        html += '</div>';
+        html += '<div style="margin-top: 15px;"><button class="btn btn-primary" onclick="closeImportAndReload()">Done</button></div>';
+        
+        resultsDiv.innerHTML = html;
+        
+    } catch (error) {
+        progressDiv.style.display = 'none';
+        resultsDiv.style.display = 'block';
+        resultsDiv.innerHTML = `
+            <div style="color: var(--sol-red); padding: 15px;">
+                <i class="fas fa-times-circle"></i> Error: ${escapeHtml(error.message)}
+            </div>
+        `;
+    } finally {
+        submitBtn.disabled = false;
+    }
+}
+
+function closeImportAndReload() {
+    closeModal('importJobsModal');
+    loadApplications();
+    loadDashboard();
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}

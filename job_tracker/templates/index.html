@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Application Tracker</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <button class="theme-toggle" id="themeToggle">
+        <i class="fas fa-moon"></i>
+        <span id="themeText">Dark</span>
+    </button>
+
+    <div class="header">
+        <div class="container">
+            <h1><i class="fas fa-briefcase"></i> Job Application Tracker</h1>
+            <p>Track your job search progress and stay organized</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-stats">
+            <div class="stat-card">
+                <h3><i class="fas fa-folder-open"></i> Total Applications</h3>
+                <div class="value" id="totalApps">0</div>
+            </div>
+            <div class="stat-card">
+                <h3><i class="fas fa-clock"></i> Screening</h3>
+                <div class="value" id="screeningApps">0</div>
+            </div>
+            <div class="stat-card">
+                <h3><i class="fas fa-users"></i> Interviews</h3>
+                <div class="value" id="interviews">0</div>
+            </div>
+            <div class="stat-card">
+                <h3><i class="fas fa-trophy"></i> Offers</h3>
+                <div class="value" id="offers">0</div>
+            </div>
+            <div class="stat-card">
+                <h3><i class="fas fa-times-circle"></i> Rejected</h3>
+                <div class="value" id="rejected">0</div>
+            </div>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-tab="applications">
+                <i class="fas fa-list"></i> Applications
+            </button>
+            <button class="nav-tab" data-tab="companies">
+                <i class="fas fa-building"></i> Companies
+            </button>
+            <button class="nav-tab" data-tab="interviews">
+                <i class="fas fa-calendar-check"></i> Interviews
+            </button>
+            <button class="nav-tab" data-tab="offers">
+                <i class="fas fa-gift"></i> Offers
+            </button>
+        </div>
+
+        <div id="applicationsTab" class="tab-content active">
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-file-alt"></i> Applications</h2>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <input type="checkbox" id="showClosedApps" style="cursor: pointer;">
+                            <span>Show Closed</span>
+                        </label>
+                        <button class="btn btn-secondary" id="importJobsBtn">
+                            <i class="fas fa-file-import"></i> Import from LinkedIn
+                        </button>
+                        <button class="btn btn-primary" id="addApplicationBtn">
+                            <i class="fas fa-plus"></i> Add Application
+                        </button>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-sort="company" style="cursor: pointer;">
+                                <i class="fas fa-building"></i> Company
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="role" style="cursor: pointer;">
+                                <i class="fas fa-user-tie"></i> Role
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="priority" style="cursor: pointer;">
+                                <i class="fas fa-star"></i> Priority
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="status" style="cursor: pointer;">
+                                <i class="fas fa-tasks"></i> Status
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="salary" style="cursor: pointer;">
+                                <i class="fas fa-dollar-sign"></i> Salary Range
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="date" style="cursor: pointer;">
+                                <i class="fas fa-calendar"></i> Applied
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th><i class="fas fa-cog"></i> Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="applicationTableBody">
+                        <tr><td colspan="7">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="companiesTab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-building"></i> Companies</h2>
+                    <button class="btn btn-primary" id="addCompanyBtn">
+                        <i class="fas fa-plus"></i> Add Company
+                    </button>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th><i class="fas fa-building"></i> Name</th>
+                            <th><i class="fas fa-users"></i> Size</th>
+                            <th><i class="fas fa-code"></i> Tech Stack</th>
+                            <th><i class="fas fa-cog"></i> Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="companyTableBody">
+                        <tr><td colspan="4">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="interviewsTab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-calendar-check"></i> Interviews & Meetings</h2>
+                    <div>
+                        <button class="btn btn-secondary" id="viewCalendarBtn">
+                            <i class="fas fa-calendar"></i> Calendar View
+                        </button>
+                        <button class="btn btn-primary" id="addInterviewBtn">
+                            <i class="fas fa-plus"></i> Add Interview
+                        </button>
+                    </div>
+                </div>
+                <div id="interviewsContainer">
+                    <p>Loading interviews...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="offersTab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-gift"></i> Offers</h2>
+                    <button class="btn btn-success" id="compareOffersBtn">
+                        <i class="fas fa-chart-bar"></i> Compare All
+                    </button>
+                </div>
+                <div id="offersContainer">
+                    <p>Loading offers...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Modal -->
+    <div id="applicationModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-file-alt"></i> Add Application</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <form id="applicationForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="companyId"><i class="fas fa-building"></i> Company *</label>
+                        <select id="companyId" class="form-control" required>
+                            <option value="">Select Company...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="role"><i class="fas fa-user-tie"></i> Role *</label>
+                        <input type="text" id="role" class="form-control" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="priority"><i class="fas fa-star"></i> Priority</label>
+                        <select id="priority" class="form-control">
+                            <option value="P1">P1</option>
+                            <option value="P2">P2</option>
+                            <option value="P3" selected>P3</option>
+                            <option value="P4">P4</option>
+                            <option value="P5">P5</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="status"><i class="fas fa-tasks"></i> Status</label>
+                        <select id="status" class="form-control">
+                            <option value="Pipeline" selected>Pipeline</option>
+                            <option value="Applied">Applied</option>
+                            <option value="Screening">Screening</option>
+                            <option value="Interview">Interview</option>
+                            <option value="Offer">Offer</option>
+                            <option value="Rejected">Rejected</option>
+                            <option value="Withdrawn">Withdrawn</option>
+                            <option value="Accepted">Accepted</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="jobUrl"><i class="fas fa-link"></i> Job Posting URL</label>
+                    <input type="url" id="jobUrl" class="form-control" placeholder="https://...">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="resumeFilename"><i class="fas fa-file-pdf"></i> Resume Filename</label>
+                        <input type="text" id="resumeFilename" class="form-control" placeholder="e.g., resume_company_role.pdf">
+                    </div>
+                    <div class="form-group">
+                        <label for="coverLetterFilename"><i class="fas fa-file-alt"></i> Cover Letter Filename</label>
+                        <input type="text" id="coverLetterFilename" class="form-control" placeholder="e.g., cover_letter_company.pdf">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="hiringManagerName"><i class="fas fa-user"></i> Hiring Manager Name</label>
+                        <input type="text" id="hiringManagerName" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="hiringManagerEmail"><i class="fas fa-envelope"></i> Hiring Manager Email</label>
+                        <input type="email" id="hiringManagerEmail" class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="location"><i class="fas fa-map-marker-alt"></i> Location</label>
+                        <input type="text" id="location" class="form-control" placeholder="e.g., Boston, MA">
+                    </div>
+                    <div class="form-group">
+                        <label for="remotePolicy"><i class="fas fa-home"></i> Remote Policy</label>
+                        <select id="remotePolicy" class="form-control">
+                            <option value="">Select...</option>
+                            <option value="Remote">Remote</option>
+                            <option value="Hybrid">Hybrid</option>
+                            <option value="On-site">On-site</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="salaryRange"><i class="fas fa-dollar-sign"></i> Salary Range</label>
+                    <input type="text" id="salaryRange" class="form-control" placeholder="e.g., $200k-250k">
+                </div>
+
+                <div class="form-group">
+                    <label for="appNotes"><i class="fas fa-sticky-note"></i> Notes</label>
+                    <textarea id="appNotes" class="form-control"></textarea>
+                </div>
+
+                <div id="pdfFilesSection" style="display: none;">
+                    <div class="form-group">
+                        <label><i class="fas fa-file-pdf"></i> Application Files</label>
+                        <div id="pdfFilesList" class="pdf-files-list"></div>
+                    </div>
+                </div>
+
+                <div class="flex flex-end">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('applicationModal')">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Application
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Company Modal -->
+    <div id="companyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-building"></i> Add Company</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <form id="companyForm">
+                <div class="form-group">
+                    <label for="companyName"><i class="fas fa-building"></i> Company Name *</label>
+                    <input type="text" id="companyName" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="website"><i class="fas fa-globe"></i> Website</label>
+                    <input type="url" id="website" class="form-control" placeholder="https://...">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="companySize"><i class="fas fa-users"></i> Company Size</label>
+                        <select id="companySize" class="form-control">
+                            <option value="">Select...</option>
+                            <option value="<50">< 50</option>
+                            <option value="50-300">50-300</option>
+                            <option value="300-1000">300-1000</option>
+                            <option value="1000+">1000+</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="techStack"><i class="fas fa-code"></i> Tech Stack</label>
+                        <input type="text" id="techStack" class="form-control" placeholder="e.g., Python, AWS, React">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="companyNotes"><i class="fas fa-sticky-note"></i> Notes</label>
+                    <textarea id="companyNotes" class="form-control"></textarea>
+                </div>
+
+                <div class="flex flex-end">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('companyModal')">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Company
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+    <script src="/static/offers.js"></script>
+</body>
+</html>
+
+    <!-- Interview Modal -->
+    <div id="interviewModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2><i class="fas fa-calendar-check"></i> <span id="interviewModalTitle">Add Interview/Meeting</span></h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <form id="interviewForm">
+                <input type="hidden" id="interviewApplicationId">
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="interviewCompany"><i class="fas fa-building"></i> Company/Application</label>
+                        <select id="interviewCompany" class="form-control" required>
+                            <option value="">Select...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="interviewType"><i class="fas fa-tag"></i> Type *</label>
+                        <select id="interviewType" class="form-control" required>
+                            <option value="">Select...</option>
+                            <option value="Phone Screen">Phone Screen</option>
+                            <option value="Video Interview">Video Interview</option>
+                            <option value="On-site Interview">On-site Interview</option>
+                            <option value="Technical Interview">Technical Interview</option>
+                            <option value="Behavioral Interview">Behavioral Interview</option>
+                            <option value="Panel Interview">Panel Interview</option>
+                            <option value="Peer Call">Peer Call</option>
+                            <option value="Colleague Meeting">Colleague Meeting</option>
+                            <option value="Coffee Chat">Coffee Chat</option>
+                            <option value="Recruiter Call">Recruiter Call</option>
+                        </select>
+                    </div>
+                </div>
+
+                <h3><i class="fas fa-clock"></i> Schedule</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="scheduledDate"><i class="fas fa-calendar-day"></i> Date *</label>
+                        <input type="date" id="scheduledDate" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="scheduledTime"><i class="fas fa-clock"></i> Time *</label>
+                        <input type="time" id="scheduledTime" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="duration"><i class="fas fa-hourglass-half"></i> Duration (mins)</label>
+                        <input type="number" id="duration" class="form-control" placeholder="e.g., 60">
+                    </div>
+                </div>
+
+                <h3><i class="fas fa-users"></i> Contact Information</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="interviewerName"><i class="fas fa-user"></i> Interviewer Name</label>
+                        <input type="text" id="interviewerName" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="interviewerTitle"><i class="fas fa-id-badge"></i> Title</label>
+                        <input type="text" id="interviewerTitle" class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="interviewerEmail"><i class="fas fa-envelope"></i> Email</label>
+                        <input type="email" id="interviewerEmail" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="interviewLocation"><i class="fas fa-map-marker-alt"></i> Location</label>
+                        <input type="text" id="interviewLocation" class="form-control" placeholder="Address or 'Video Call'">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="meetingLink"><i class="fas fa-video"></i> Meeting Link (Zoom, Teams, etc.)</label>
+                    <input type="url" id="meetingLink" class="form-control" placeholder="https://zoom.us/j/...">
+                </div>
+
+                <div class="form-group">
+                    <label for="interviewNotes"><i class="fas fa-sticky-note"></i> Notes & Preparation</label>
+                    <textarea id="interviewNotes" class="form-control" placeholder="Topics to prepare, questions to ask, research notes..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="completed"><i class="fas fa-check-circle"></i> Completed</label>
+                    <select id="completed" class="form-control">
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-end">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('interviewModal')">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Interview
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+    <script src="/static/offers.js"></script>
+    <script src="/static/interviews.js"></script>
+    <script>
+        // Theme toggle functionality
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = themeToggle.querySelector('i');
+        const themeText = document.getElementById('themeText');
+        const html = document.documentElement;
+        
+        // Check for saved theme preference or default to dark
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        html.setAttribute('data-theme', savedTheme);
+        updateThemeUI(savedTheme);
+        
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeUI(newTheme);
+        });
+        
+        function updateThemeUI(theme) {
+            if (theme === 'dark') {
+                themeIcon.className = 'fas fa-moon';
+                themeText.textContent = 'Dark';
+            } else {
+                themeIcon.className = 'fas fa-sun';
+                themeText.textContent = 'Light';
+            }
+        }
+    </script>
+
+    <!-- Import Jobs Modal -->
+    <div id="importJobsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-file-import"></i> Import Jobs from LinkedIn</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <form id="importJobsForm">
+                <div class="form-group">
+                    <label for="jobUrls"><i class="fas fa-link"></i> LinkedIn Job URLs</label>
+                    <p style="font-size: 0.9em; color: var(--text-secondary); margin-bottom: 10px;">
+                        Paste LinkedIn job URLs (one per line). Example:<br>
+                        <code style="font-size: 0.85em;">https://www.linkedin.com/jobs/view/1234567890</code>
+                    </p>
+                    <textarea 
+                        id="jobUrls" 
+                        class="form-control" 
+                        rows="10" 
+                        placeholder="https://www.linkedin.com/jobs/view/1234567890&#10;https://www.linkedin.com/jobs/view/0987654321&#10;..."
+                        required
+                    ></textarea>
+                </div>
+
+                <div id="importProgress" style="display: none; margin: 15px 0;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>Importing jobs...</span>
+                    </div>
+                </div>
+
+                <div id="importResults" style="display: none; margin: 15px 0;">
+                    <!-- Results will be displayed here -->
+                </div>
+
+                <div class="flex flex-end">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('importJobsModal')">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-file-import"></i> Import Jobs
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
