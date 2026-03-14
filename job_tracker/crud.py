@@ -3,7 +3,8 @@ CRUD operations for database
 """
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Tuple
+from sqlalchemy import or_
 from . import database as db
 from . import models
 
@@ -298,3 +299,76 @@ def get_dashboard_stats(session: Session):
         recent_applications=recent,
         upcoming_interviews=upcoming
     )
+
+
+def get_weekly_activity(session: Session, start_date: datetime, end_date: datetime):
+    """
+    Get all job search activity for a given week (Sunday to Saturday).
+    Returns applications that had activity during the week.
+    """
+    # Query applications with any activity in the date range
+    applications = session.query(db.Application).filter(
+        or_(
+            db.Application.date_applied.between(start_date, end_date),
+            db.Application.date_screening.between(start_date, end_date),
+            db.Application.date_interview.between(start_date, end_date),
+            db.Application.date_offer.between(start_date, end_date),
+            db.Application.date_closed.between(start_date, end_date)
+        )
+    ).all()
+    
+    results = []
+    for app in applications:
+        company = session.query(db.Company).filter(db.Company.id == app.company_id).first()
+        
+        # Determine the activity date and result for this week
+        activity_date = None
+        result = None
+        
+        if app.date_applied and start_date <= app.date_applied <= end_date:
+            activity_date = app.date_applied
+            result = "Applied"
+        elif app.date_screening and start_date <= app.date_screening <= end_date:
+            activity_date = app.date_screening
+            result = "Screening"
+        elif app.date_interview and start_date <= app.date_interview <= end_date:
+            activity_date = app.date_interview
+            result = "Interview"
+        elif app.date_offer and start_date <= app.date_offer <= end_date:
+            activity_date = app.date_offer
+            result = "Offer Received"
+        elif app.date_closed and start_date <= app.date_closed <= end_date:
+            activity_date = app.date_closed
+            result = app.status  # Rejected, Withdrawn, or Accepted
+        
+        if activity_date:
+            # Get contact info - prefer hiring manager, then any contact
+            contact_email = app.hiring_manager_email or ""
+            contact_person = app.hiring_manager_name or ""
+            
+            if not contact_email and not contact_person:
+                contacts = session.query(db.Contact).filter(
+                    db.Contact.company_id == app.company_id
+                ).first()
+                if contacts:
+                    contact_person = contacts.name
+                    contact_email = contacts.email or ""
+            
+            # Build company address from website or location
+            company_address = company.website or app.location or ""
+            
+            results.append({
+                'date': activity_date,
+                'position': app.role,
+                'pay_rate': app.salary_range or "Not specified",
+                'employer_name': company.name,
+                'employer_address': company_address,
+                'job_id': app.job_url or f"Application #{app.id}",
+                'contact_person': contact_person,
+                'contact_email': contact_email,
+                'result': result
+            })
+    
+    # Sort by date
+    results.sort(key=lambda x: x['date'])
+    return results

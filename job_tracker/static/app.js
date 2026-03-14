@@ -26,6 +26,7 @@ function setupEventListeners() {
     document.getElementById('addApplicationBtn').addEventListener('click', () => openApplicationModal());
     document.getElementById('addCompanyBtn').addEventListener('click', () => openCompanyModal());
     document.getElementById('importJobsBtn').addEventListener('click', () => openImportJobsModal());
+    document.getElementById('exportDUABtn').addEventListener('click', () => openDUAExportModal());
     document.getElementById('applicationForm').addEventListener('submit', handleApplicationSubmit);
     document.getElementById('companyForm').addEventListener('submit', handleCompanySubmit);
     document.getElementById('importJobsForm').addEventListener('submit', handleImportJobs);
@@ -561,4 +562,94 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// MA DUA Export Functions
+let currentDUAReport = '';
+let currentDUAWeekStart = '';
+
+function openDUAExportModal() {
+    document.getElementById('duaPreview').style.display = 'none';
+    document.getElementById('duaCopyBtn').style.display = 'none';
+    document.getElementById('duaDownloadBtn').style.display = 'none';
+    document.getElementById('duaWeekStart').value = '';
+    currentDUAReport = '';
+    openModal('duaExportModal');
+}
+
+function getLastSunday(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = day === 0 ? 0 : day;
+    d.setDate(d.getDate() - diff);
+    return d;
+}
+
+async function selectDUAWeek(period) {
+    const today = new Date();
+    let weekStart;
+    
+    if (period === 'this') {
+        weekStart = getLastSunday(today);
+    } else if (period === 'last') {
+        const lastWeek = new Date(today);
+        lastWeek.setDate(lastWeek.getDate() - 7);
+        weekStart = getLastSunday(lastWeek);
+    }
+    
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+    document.getElementById('duaWeekStart').value = weekStartStr;
+    await loadDUAReport(weekStartStr);
+}
+
+document.getElementById('duaWeekStart').addEventListener('change', async (e) => {
+    if (e.target.value) {
+        const selectedDate = new Date(e.target.value);
+        const sunday = getLastSunday(selectedDate);
+        const weekStartStr = sunday.toISOString().split('T')[0];
+        e.target.value = weekStartStr;
+        await loadDUAReport(weekStartStr);
+    }
+});
+
+async function loadDUAReport(weekStart) {
+    try {
+        const response = await fetch(`${API_BASE}/reports/dua-weekly?week_start=${weekStart}`);
+        const report = await response.text();
+        
+        currentDUAReport = report;
+        currentDUAWeekStart = weekStart;
+        
+        document.getElementById('duaPreviewText').textContent = report;
+        document.getElementById('duaPreview').style.display = 'block';
+        document.getElementById('duaCopyBtn').style.display = 'inline-block';
+        document.getElementById('duaDownloadBtn').style.display = 'inline-block';
+    } catch (error) {
+        alert('Error loading report: ' + error.message);
+    }
+}
+
+function copyDUAReport() {
+    navigator.clipboard.writeText(currentDUAReport).then(() => {
+        const btn = document.getElementById('duaCopyBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+        }, 2000);
+    }).catch(err => {
+        alert('Failed to copy to clipboard: ' + err);
+    });
+}
+
+function downloadDUAReport() {
+    const blob = new Blob([currentDUAReport], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `MA_DUA_Activity_${currentDUAWeekStart}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }

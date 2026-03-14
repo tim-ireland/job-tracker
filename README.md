@@ -10,6 +10,7 @@ A comprehensive web-based job application tracking system with LaTeX resume gene
 - 👥 **Company Tracking**: Maintain company information, contacts, and tech stacks
 - 📅 **Interview Scheduling**: Track interviews with dates, interviewers, and outcomes
 - 💼 **Offer Comparison**: Compare multiple job offers side-by-side
+- 📋 **MA DUA Export**: Export weekly activity reports for Massachusetts Department of Unemployment Assistance
 - 🎨 **Modern UI**: Clean, responsive interface with dark/light mode
 - 🐳 **Docker Support**: Containerized application with persistent data volumes
 
@@ -155,6 +156,59 @@ Create custom templates in your data directory at `custom_templates/`.
 Once running, view the interactive API documentation at:
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
+
+### Weekly Activity Export (Massachusetts DUA)
+
+The toolkit includes specialized endpoints for exporting job search activity in the format required by the Massachusetts Department of Unemployment Assistance.
+
+#### Export Previous Week (Text Format)
+```bash
+curl http://localhost:8000/api/reports/dua-weekly
+```
+
+#### Export Specific Week (Text Format)
+```bash
+# Week starting Sunday, March 9, 2026
+curl http://localhost:8000/api/reports/dua-weekly?week_start=2026-03-09
+```
+
+#### Export Previous Week (CSV Format)
+```bash
+curl http://localhost:8000/api/reports/dua-weekly-csv -o weekly_report.csv
+```
+
+#### Export Specific Week (CSV Format)
+```bash
+curl "http://localhost:8000/api/reports/dua-weekly-csv?week_start=2026-03-09" -o weekly_report.csv
+```
+
+#### Export Date Range (Text Format)
+```bash
+# Get all activity from February 1 through March 31, 2026
+curl "http://localhost:8000/api/reports/dua-range?start_date=2026-02-01&end_date=2026-03-31"
+```
+
+#### Export Date Range (CSV Format)
+```bash
+curl "http://localhost:8000/api/reports/dua-range-csv?start_date=2026-02-01&end_date=2026-03-31" -o range_report.csv
+```
+
+**Report Format:**
+Each activity entry includes:
+- Date: When the activity occurred
+- Position: Job title
+- Pay rate: Salary range or "Not specified"
+- Employer name and address: Company name with website or location
+- Job ID or person contacted: Application ID or contact person
+- Contact email, website, or phone: Contact information
+- Result: Status of the application (Applied, Screening, Interview, Offer Received, Rejected, etc.)
+
+The export captures ALL job search activity that progressed during the week, including:
+- Applications submitted
+- Phone screenings received
+- Interviews conducted
+- Offers received
+- Applications closed (rejected/withdrawn/accepted)
 
 ## Development
 
