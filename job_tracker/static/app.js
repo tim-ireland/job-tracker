@@ -5,6 +5,7 @@ let currentApplication = null;
 let sortColumn = null;
 let sortDirection = 'asc';
 let showClosedApps = false;
+let statusFilter = null;  // Track active status filter
 
 document.addEventListener('DOMContentLoaded', async () => {
     loadDashboard();
@@ -25,11 +26,16 @@ function setupEventListeners() {
 
     document.getElementById('addApplicationBtn').addEventListener('click', () => openApplicationModal());
     document.getElementById('addCompanyBtn').addEventListener('click', () => openCompanyModal());
-    document.getElementById('importJobsBtn').addEventListener('click', () => openImportJobsModal());
+    // importJobsBtn is commented out in HTML - skip event listener
+    // document.getElementById('importJobsBtn').addEventListener('click', () => openImportJobsModal());
     document.getElementById('exportDUABtn').addEventListener('click', () => openDUAExportModal());
     document.getElementById('applicationForm').addEventListener('submit', handleApplicationSubmit);
     document.getElementById('companyForm').addEventListener('submit', handleCompanySubmit);
-    document.getElementById('importJobsForm').addEventListener('submit', handleImportJobs);
+    // importJobsForm is only relevant if import button is active
+    const importJobsForm = document.getElementById('importJobsForm');
+    if (importJobsForm) {
+        importJobsForm.addEventListener('submit', handleImportJobs);
+    }
     
     // Show/hide closed applications toggle
     document.getElementById('showClosedApps').addEventListener('change', (e) => {
@@ -48,6 +54,7 @@ function setupModalClickOutside() {
     // Close modal when clicking on the backdrop (outside modal content)
     document.querySelectorAll('.modal').forEach(modal => {
         modal.addEventListener('click', (e) => {
+            // Close if the click target is the modal itself (the backdrop)
             if (e.target === modal) {
                 closeModal(modal.id);
             }
@@ -145,9 +152,61 @@ async function loadDashboard() {
         document.getElementById('interviews').textContent = data.by_status.Interview || 0;
         document.getElementById('offers').textContent = data.by_status.Offer || 0;
         document.getElementById('rejected').textContent = data.by_status.Rejected || 0;
+        
+        // Add click handlers for filtering
+        setupDashboardFilters();
     } catch (error) {
         console.error('Error loading dashboard:', error);
     }
+}
+
+function setupDashboardFilters() {
+    // Make stat cards clickable
+    const statCards = document.querySelectorAll('.stat-card');
+    statCards.forEach((card, index) => {
+        card.style.cursor = 'pointer';
+        card.style.transition = 'transform 0.2s, box-shadow 0.2s';
+        
+        // Map card index to filter
+        let filterStatus = null;
+        switch(index) {
+            case 0: filterStatus = null; break;  // Total - no filter
+            case 1: filterStatus = 'Screening'; break;
+            case 2: filterStatus = 'Interview'; break;
+            case 3: filterStatus = 'Offer'; break;
+            case 4: filterStatus = 'Rejected'; break;
+        }
+        
+        card.onclick = () => {
+            // Toggle filter
+            if (statusFilter === filterStatus) {
+                statusFilter = null;  // Clear filter
+                statCards.forEach(c => c.classList.remove('active-filter'));
+            } else {
+                statusFilter = filterStatus;
+                statCards.forEach(c => c.classList.remove('active-filter'));
+                card.classList.add('active-filter');
+                
+                // Auto-enable show closed if filtering for rejected
+                if (filterStatus === 'Rejected') {
+                    showClosedApps = true;
+                    document.getElementById('showClosedApps').checked = true;
+                }
+            }
+            
+            updateApplicationList();
+        };
+        
+        // Hover effect
+        card.onmouseenter = () => {
+            if (statusFilter !== filterStatus) {
+                card.style.transform = 'translateY(-2px)';
+            }
+        };
+        card.onmouseleave = () => {
+            card.style.transform = 'translateY(0)';
+        };
+    });
 }
 
 async function loadCompanies() {
@@ -205,9 +264,14 @@ function updateApplicationList() {
     
     // Filter applications based on showClosedApps toggle
     const closedStatuses = ['Rejected', 'Withdrawn', 'Accepted'];
-    const filteredApps = showClosedApps 
+    let filteredApps = showClosedApps 
         ? applications 
         : applications.filter(app => !closedStatuses.includes(app.status));
+    
+    // Apply status filter if active
+    if (statusFilter) {
+        filteredApps = filteredApps.filter(app => app.status === statusFilter);
+    }
     
     if (filteredApps.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7">No applications to display</td></tr>';
@@ -615,15 +679,18 @@ async function selectDUAWeek(period) {
     await loadDUAReport(weekStartStr);
 }
 
-document.getElementById('duaWeekStart').addEventListener('change', async (e) => {
-    if (e.target.value) {
-        const selectedDate = new Date(e.target.value);
-        const sunday = getLastSunday(selectedDate);
-        const weekStartStr = sunday.toISOString().split('T')[0];
-        e.target.value = weekStartStr;
-        await loadDUAReport(weekStartStr);
-    }
-});
+const duaWeekStartInput = document.getElementById('duaWeekStart');
+if (duaWeekStartInput) {
+    duaWeekStartInput.addEventListener('change', async (e) => {
+        if (e.target.value) {
+            const selectedDate = new Date(e.target.value);
+            const sunday = getLastSunday(selectedDate);
+            const weekStartStr = sunday.toISOString().split('T')[0];
+            e.target.value = weekStartStr;
+            await loadDUAReport(weekStartStr);
+        }
+    });
+}
 
 async function loadDUAReport(weekStart) {
     try {

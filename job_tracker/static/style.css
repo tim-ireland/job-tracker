@@ -167,11 +167,19 @@ body {
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
     transition: all 0.2s ease;
+    cursor: pointer;
 }
 
 .stat-card:hover {
     border-color: var(--border-hover);
     box-shadow: var(--shadow-sm);
+    transform: translateY(-2px);
+}
+
+.stat-card.active-filter {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(38, 139, 210, 0.1);
+    background: var(--bg-primary);
 }
 
 .stat-card h3 {
@@ -463,6 +471,7 @@ tr:hover {
     z-index: 1000;
     align-items: center;
     justify-content: center;
+    padding: 20px;
 }
 
 .modal.active {
@@ -479,6 +488,7 @@ tr:hover {
     overflow-y: auto;
     border: 1px solid var(--border-color);
     box-shadow: var(--shadow-lg);
+    position: relative;
 }
 
 .modal-large {
