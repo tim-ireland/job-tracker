@@ -120,8 +120,18 @@ case "$TEMPLATE" in
         ;;
 esac
 
-cp "templates/${RESUME_TEMPLATE}.tex" "$APP_DIR/resume.tex"
-cp "templates/${COVER_TEMPLATE}.tex" "$APP_DIR/cover_letter.tex"
+# Determine templates directory (check custom first, then fallback to default)
+if [ -f "${DATA_DIR}/templates/${RESUME_TEMPLATE}.tex" ]; then
+    TEMPLATES_DIR="${DATA_DIR}/templates"
+elif [ -f "/app/templates/${RESUME_TEMPLATE}.tex" ]; then
+    TEMPLATES_DIR="/app/templates"
+else
+    # Fallback to relative path (for local execution)
+    TEMPLATES_DIR="templates"
+fi
+
+cp "${TEMPLATES_DIR}/${RESUME_TEMPLATE}.tex" "$APP_DIR/resume.tex"
+cp "${TEMPLATES_DIR}/${COVER_TEMPLATE}.tex" "$APP_DIR/cover_letter.tex"
 
 echo "✓ Created application directory: $APP_DIR"
 
