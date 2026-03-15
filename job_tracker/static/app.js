@@ -251,7 +251,7 @@ function openApplicationModal(applicationId = null, viewOnly = false) {
         modalTitle.innerHTML = '<i class="fas fa-eye"></i> View Application';
         submitBtn.style.display = 'none';
     } else if (applicationId) {
-        modalTitle.innerHTML = '<i class="fas fa-edit"></i> Edit Application';
+        modalTitle.innerHTML = `<i class="fas fa-edit"></i> Edit Application (ID: ${applicationId})`;
         submitBtn.style.display = 'inline-flex';
     } else {
         modalTitle.innerHTML = '<i class="fas fa-plus"></i> Add Application';
@@ -403,12 +403,25 @@ async function handleApplicationSubmit(e) {
         });
         
         if (response.ok) {
+            const result = await response.json();
             closeModal('applicationModal');
             loadApplications();
             loadDashboard();
+            
+            // If status changed to a closed status, show helpful message
+            const closedStatuses = ['Rejected', 'Withdrawn', 'Accepted'];
+            if (closedStatuses.includes(data.status) && !showClosedApps) {
+                setTimeout(() => {
+                    alert(`Application marked as "${data.status}". Enable "Show Closed" to view it in the list.`);
+                }, 100);
+            }
+        } else {
+            const error = await response.json();
+            alert('Error saving application: ' + (error.detail || 'Unknown error'));
         }
     } catch (error) {
         console.error('Error saving application:', error);
+        alert('Error saving application: ' + error.message);
     }
 }
 

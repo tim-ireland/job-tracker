@@ -106,6 +106,11 @@ def update_application(session: Session, application_id: int, application: model
 def delete_application(session: Session, application_id: int):
     db_application = get_application(session, application_id)
     if db_application:
+        # Delete related records first to avoid foreign key constraints
+        session.query(db.Interview).filter(db.Interview.application_id == application_id).delete()
+        session.query(db.Interaction).filter(db.Interaction.application_id == application_id).delete()
+        session.query(db.Offer).filter(db.Offer.application_id == application_id).delete()
+        
         session.delete(db_application)
         session.commit()
         return True
