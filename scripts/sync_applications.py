@@ -112,8 +112,12 @@ def sync_to_database(db: Session, filesystem_apps):
     # Get existing applications
     db_apps = get_applications(db)
     
-    # Create a dict of existing (company, role) -> app for lookup
-    existing = {(app.company.name, app.role): app for app in db_apps}
+    # Create a dict of existing (company, normalized_role) -> app for lookup
+    # Normalize by removing extra whitespace and lowercasing for comparison
+    existing = {}
+    for app in db_apps:
+        key = (app.company.name, ' '.join(app.role.split()).lower())
+        existing[key] = app
     
     added_count = 0
     updated_count = 0
@@ -123,9 +127,12 @@ def sync_to_database(db: Session, filesystem_apps):
         company_name = app_data['company']
         role = app_data['role']
         
+        # Normalize for lookup
+        normalized_key = (company_name, ' '.join(role.split()).lower())
+        
         # Check if already exists
-        if (company_name, role) in existing:
-            existing_app = existing[(company_name, role)]
+        if normalized_key in existing:
+            existing_app = existing[normalized_key]
             
             # Update PDF filenames if they're missing but we found them
             needs_update = False
