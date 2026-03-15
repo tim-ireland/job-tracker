@@ -148,6 +148,8 @@ async function loadDashboard() {
         const response = await fetch(`${API_BASE}/dashboard`);
         const data = await response.json();
         document.getElementById('totalApps').textContent = data.total_applications;
+        const appliedCount = (data.by_status.Applied || 0) + (data.by_status.Screening || 0);
+        document.getElementById('appliedApps').textContent = appliedCount;
         document.getElementById('screeningApps').textContent = data.by_status.Screening || 0;
         document.getElementById('interviews').textContent = data.by_status.Interview || 0;
         document.getElementById('offers').textContent = data.by_status.Offer || 0;
@@ -171,10 +173,11 @@ function setupDashboardFilters() {
         let filterStatus = null;
         switch(index) {
             case 0: filterStatus = null; break;  // Total - no filter
-            case 1: filterStatus = 'Screening'; break;
-            case 2: filterStatus = 'Interview'; break;
-            case 3: filterStatus = 'Offer'; break;
-            case 4: filterStatus = 'Rejected'; break;
+            case 1: filterStatus = 'Applied+Screening'; break;  // Applied (includes Screening)
+            case 2: filterStatus = 'Screening'; break;
+            case 3: filterStatus = 'Interview'; break;
+            case 4: filterStatus = 'Offer'; break;
+            case 5: filterStatus = 'Rejected'; break;
         }
         
         card.onclick = () => {
@@ -270,7 +273,12 @@ function updateApplicationList() {
     
     // Apply status filter if active
     if (statusFilter) {
-        filteredApps = filteredApps.filter(app => app.status === statusFilter);
+        if (statusFilter === 'Applied+Screening') {
+            // Special case: filter for Applied OR Screening (excluding Pipeline)
+            filteredApps = filteredApps.filter(app => app.status === 'Applied' || app.status === 'Screening');
+        } else {
+            filteredApps = filteredApps.filter(app => app.status === statusFilter);
+        }
     }
     
     if (filteredApps.length === 0) {
