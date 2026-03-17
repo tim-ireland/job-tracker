@@ -383,7 +383,23 @@ async function loadApplicationPDFs(applicationId) {
         const data = await response.json();
         const pdfList = document.getElementById('pdfFilesList');
         
+        console.log('Loading PDFs for application:', applicationId, 'Found:', data.pdfs?.length || 0);
+        
         if (data.pdfs && data.pdfs.length > 0) {
+            // Update resume/cover letter fields with actual filenames if found
+            const resumeInput = document.getElementById('resumeFilename');
+            const coverLetterInput = document.getElementById('coverLetterFilename');
+            
+            data.pdfs.forEach(pdf => {
+                const lowerName = pdf.name.toLowerCase();
+                if (lowerName.includes('resume') && !resumeInput.value) {
+                    resumeInput.value = pdf.path;
+                }
+                if (lowerName.includes('cover') && !coverLetterInput.value) {
+                    coverLetterInput.value = pdf.path;
+                }
+            });
+            
             pdfList.innerHTML = data.pdfs.map(pdf => `
                 <div class="pdf-file-item">
                     <i class="fas fa-file-pdf"></i>
@@ -392,11 +408,14 @@ async function loadApplicationPDFs(applicationId) {
                 </div>
             `).join('');
         } else {
-            pdfList.innerHTML = '<p class="empty-state">No PDF files found in application directory</p>';
+            pdfList.innerHTML = '<p class="empty-state">No files found in application directory</p>';
         }
+        
+        // Setup drag and drop
+        setupFileUpload(applicationId);
     } catch (error) {
         console.error('Error loading PDFs:', error);
-        document.getElementById('pdfFilesList').innerHTML = '<p class="empty-state">Error loading PDF files</p>';
+        document.getElementById('pdfFilesList').innerHTML = '<p class="empty-state">Error loading files</p>';
     }
 }
 
@@ -740,4 +759,90 @@ function downloadDUAReport() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+// File Upload Functions
+function setupFileUpload(applicationId) {
+    const uploadZone = document.getElementById('fileUploadZone');
+    const fileInput = document.getElementById('fileInput');
+    
+    if (!uploadZone || !fileInput) return;
+    
+    // Click to upload
+    uploadZone.onclick = () => fileInput.click();
+    
+    // File input change
+    fileInput.onchange = (e) => {
+        if (e.target.files.length > 0) {
+            handleFileUpload(applicationId, e.target.files);
+        }
+    };
+    
+    // Drag and drop
+    uploadZone.ondragover = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        uploadZone.classList.add('drag-over');
+    };
+    
+    uploadZone.ondragleave = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        uploadZone.classList.remove('drag-over');
+    };
+    
+    uploadZone.ondrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        uploadZone.classList.remove('drag-over');
+        
+        if (e.dataTransfer.files.length > 0) {
+            handleFileUpload(applicationId, e.dataTransfer.files);
+        }
+    };
+}
+
+async function handleFileUpload(applicationId, files) {
+    const progressDiv = document.getElementById('uploadProgress');
+    const fileInput = document.getElementById('fileInput');
+    progressDiv.style.display = 'block';
+    
+    try {
+        for (const file of files) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const response = await fetch(`${API_BASE}/applications/${applicationId}/upload`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Upload failed');
+            }
+        }
+        
+        // Reset file input
+        fileInput.value = '';
+        
+        // Reload PDFs list
+        await loadApplicationPDFs(applicationId);
+        
+        // Show success message briefly
+        progressDiv.innerHTML = '<i class="fas fa-check-circle"></i> Upload complete!';
+        setTimeout(() => {
+            progressDiv.style.display = 'none';
+            progressDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Upload error:', error);
+        fileInput.value = '';
+        progressDiv.innerHTML = `<i class="fas fa-times-circle"></i> Error: ${error.message}`;
+        setTimeout(() => {
+            progressDiv.style.display = 'none';
+            progressDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+        }, 3000);
+    }
 }

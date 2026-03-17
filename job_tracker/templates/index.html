@@ -286,6 +286,14 @@
                     <div class="form-group">
                         <label><i class="fas fa-file-pdf"></i> Application Files</label>
                         <div id="pdfFilesList" class="pdf-files-list"></div>
+                        <div id="fileUploadZone" class="file-upload-zone">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Drag & drop files here or click to upload</p>
+                            <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.txt" style="display: none;">
+                        </div>
+                        <div id="uploadProgress" style="display: none; margin-top: 10px;">
+                            <i class="fas fa-spinner fa-spin"></i> Uploading...
+                        </div>
                     </div>
                 </div>
 

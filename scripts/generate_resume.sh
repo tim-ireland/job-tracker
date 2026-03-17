@@ -1,7 +1,7 @@
 #!/bin/bash
 # Script to generate PDF from LaTeX resume
 
-TEMPLATES_DIR="/Users/tim/Development/resume_2026/templates"
+TEMPLATES_DIR="/Users/tim/Development/my-job-search-2026/templates"
 
 # Function to generate a resume
 generate_resume() {

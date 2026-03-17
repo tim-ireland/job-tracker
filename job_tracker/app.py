@@ -1,7 +1,7 @@
 """
 FastAPI application for job tracking
 """
-from fastapi import FastAPI, Depends, HTTPException, Request, Body
+from fastapi import FastAPI, Depends, HTTPException, Request, Body, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse, StreamingResponse
@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 import os
 import io
 import csv
+import shutil
 
 from . import crud, models
 from . import database as db_models
@@ -224,6 +225,14 @@ def list_application_pdfs(application_id: int, db: Session = Depends(get_db)):
         dir_name = Path(application.resume_filename).parent
     elif application.cover_letter_filename:
         dir_name = Path(application.cover_letter_filename).parent
+    else:
+        # Try to construct directory name from company and role
+        company = application.company
+        if company:
+            dir_name_str = f"{company.name}_{application.role}".replace(' ', '_')
+            # Remove special characters that might have been sanitized
+            dir_name_str = ''.join(c if c.isalnum() or c in ['_', '-'] else '_' for c in dir_name_str)
+            dir_name = Path(dir_name_str)
     
     if not dir_name:
         return {"pdfs": []}
@@ -232,22 +241,65 @@ def list_application_pdfs(application_id: int, db: Session = Depends(get_db)):
     if not app_dir.exists():
         return {"pdfs": []}
     
-    # Find all PDF files
+    # Find all files (not just PDFs)
     pdfs = []
-    for pdf_file in app_dir.glob("*.pdf"):
-        pdfs.append({
-            "name": pdf_file.name,
-            "path": str(pdf_file.relative_to(APPLICATIONS_DIR)),
-            "size": pdf_file.stat().st_size,
-            "modified": pdf_file.stat().st_mtime
-        })
+    for file_path in app_dir.iterdir():
+        if file_path.is_file() and not file_path.name.startswith('.'):
+            pdfs.append({
+                "name": file_path.name,
+                "path": str(file_path.relative_to(APPLICATIONS_DIR)),
+                "size": file_path.stat().st_size,
+                "modified": file_path.stat().st_mtime
+            })
     
     return {"pdfs": sorted(pdfs, key=lambda x: x["modified"], reverse=True)}
 
 
+@app.post("/api/applications/{application_id}/upload")
+async def upload_application_file(
+    application_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload a file to an application directory"""
+    application = crud.get_application(db, application_id)
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    # Determine application directory
+    dir_name = None
+    if application.resume_filename:
+        dir_name = Path(application.resume_filename).parent
+    elif application.cover_letter_filename:
+        dir_name = Path(application.cover_letter_filename).parent
+    else:
+        # Create a directory name based on company and role
+        company = application.company
+        dir_name_str = f"{company.name}_{application.role}".replace(' ', '_')
+        dir_name = Path(dir_name_str)
+    
+    app_dir = APPLICATIONS_DIR / dir_name
+    app_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Save the uploaded file
+    file_path = app_dir / file.filename
+    
+    try:
+        with file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        return {
+            "success": True,
+            "filename": file.filename,
+            "path": str(file_path.relative_to(APPLICATIONS_DIR))
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error saving file: {str(e)}")
+
+
 @app.get("/api/files/pdf/{file_path:path}")
 def get_pdf_file(file_path: str):
-    """Serve a PDF file from the applications directory"""
+    """Serve a file from the applications directory"""
     full_path = APPLICATIONS_DIR / file_path
     
     # Security check: ensure the path is within applications directory
@@ -262,12 +314,19 @@ def get_pdf_file(file_path: str):
     if not full_path.exists() or not full_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
     
-    if not full_path.suffix.lower() == '.pdf':
-        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    # Determine media type based on extension
+    media_type = "application/octet-stream"
+    suffix = full_path.suffix.lower()
+    if suffix == '.pdf':
+        media_type = "application/pdf"
+    elif suffix in ['.doc', '.docx']:
+        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    elif suffix == '.txt':
+        media_type = "text/plain"
     
     return FileResponse(
         full_path,
-        media_type="application/pdf",
+        media_type=media_type,
         filename=full_path.name
     )
 

@@ -1055,3 +1055,38 @@ textarea.form-control {
     font-size: 13px;
     font-weight: 500;
 }
+
+/* File Upload Zone */
+.file-upload-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 30px;
+    text-align: center;
+    background: var(--bg-tertiary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 10px;
+}
+
+.file-upload-zone:hover {
+    border-color: var(--primary-color);
+    background: rgba(38, 139, 210, 0.05);
+}
+
+.file-upload-zone.drag-over {
+    border-color: var(--primary-color);
+    background: rgba(38, 139, 210, 0.1);
+    border-style: solid;
+}
+
+.file-upload-zone i {
+    font-size: 48px;
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+.file-upload-zone p {
+    color: var(--text-secondary);
+    margin: 10px 0 0 0;
+    font-size: 14px;
+}

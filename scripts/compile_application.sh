@@ -18,6 +18,10 @@ fi
 
 cd "$APP_DIR" || exit 1
 
+# Extract company and role from directory name
+COMPANY=$(echo "$DIR_NAME" | cut -d'_' -f1)
+ROLE=$(echo "$DIR_NAME" | cut -d'_' -f2- | sed 's/_/ /g')
+
 echo "Compiling documents in $APP_DIR..."
 echo ""
 
@@ -28,6 +32,16 @@ if [ -f "resume.tex" ]; then
     pdflatex -interaction=nonstopmode resume.tex > /dev/null
     if [ -f "resume.pdf" ]; then
         echo "   ✓ resume.pdf generated"
+        
+        # Add metadata to PDF
+        if command -v python3 &> /dev/null && [ -f "../../scripts/add_pdf_metadata.py" ]; then
+            python3 ../../scripts/add_pdf_metadata.py resume.pdf \
+                --source-tex resume.tex \
+                --company "$COMPANY" \
+                --role "$ROLE" \
+                --resume-version "$(date +%Y%m%d-%H%M%S)" > /dev/null 2>&1
+            echo "   ✓ Metadata added"
+        fi
     else
         echo "   ✗ Failed to generate resume.pdf"
     fi
@@ -44,6 +58,15 @@ if [ -f "cover_letter.tex" ]; then
     pdflatex -interaction=nonstopmode cover_letter.tex > /dev/null
     if [ -f "cover_letter.pdf" ]; then
         echo "   ✓ cover_letter.pdf generated"
+        
+        # Add metadata to PDF
+        if command -v python3 &> /dev/null && [ -f "../../scripts/add_pdf_metadata.py" ]; then
+            python3 ../../scripts/add_pdf_metadata.py cover_letter.pdf \
+                --source-tex cover_letter.tex \
+                --company "$COMPANY" \
+                --role "$ROLE" > /dev/null 2>&1
+            echo "   ✓ Metadata added"
+        fi
     else
         echo "   ✗ Failed to generate cover_letter.pdf"
     fi
