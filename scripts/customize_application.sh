@@ -9,7 +9,8 @@ if [ $# -lt 1 ]; then
 fi
 
 DIR_NAME=$1
-APP_DIR="applications/${DIR_NAME}"
+DATA_DIR="${DATA_DIR:-.}"
+APP_DIR="${DATA_DIR}/applications/${DIR_NAME}"
 
 if [ ! -d "$APP_DIR" ]; then
     echo "Error: Directory $APP_DIR does not exist"

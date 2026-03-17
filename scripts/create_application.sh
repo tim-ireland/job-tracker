@@ -24,13 +24,13 @@ COMPANY=$1
 JOB_TITLE=$2
 TEMPLATE=${3:-base}
 
-# Parse optional arguments
-DB_ARGS=""
+# Parse optional arguments - store in array for safe passing
+DB_ARGS=()
 shift 3 2>/dev/null || shift 2
 for arg in "$@"; do
     case $arg in
         --job-url=*|--location=*|--priority=*|--status=*|--remote-policy=*|--salary-range=*)
-            DB_ARGS="$DB_ARGS $arg"
+            DB_ARGS+=("$arg")
             ;;
     esac
 done
@@ -120,14 +120,29 @@ case "$TEMPLATE" in
         ;;
 esac
 
-# Determine templates directory (check custom first, then fallback to default)
+# Determine templates directory (check multiple locations)
 if [ -f "${DATA_DIR}/templates/${RESUME_TEMPLATE}.tex" ]; then
     TEMPLATES_DIR="${DATA_DIR}/templates"
 elif [ -f "/app/templates/${RESUME_TEMPLATE}.tex" ]; then
     TEMPLATES_DIR="/app/templates"
-else
-    # Fallback to relative path (for local execution)
+elif [ -f "templates/${RESUME_TEMPLATE}.tex" ]; then
     TEMPLATES_DIR="templates"
+else
+    echo "Error: Template files not found!"
+    echo "Looked in:"
+    echo "  - ${DATA_DIR}/templates/"
+    echo "  - /app/templates/"
+    echo "  - templates/"
+    echo ""
+    echo "Please ensure template files exist in one of these locations."
+    exit 1
+fi
+
+if [ ! -f "${TEMPLATES_DIR}/${RESUME_TEMPLATE}.tex" ] || [ ! -f "${TEMPLATES_DIR}/${COVER_TEMPLATE}.tex" ]; then
+    echo "Error: Required template files not found:"
+    echo "  - ${TEMPLATES_DIR}/${RESUME_TEMPLATE}.tex"
+    echo "  - ${TEMPLATES_DIR}/${COVER_TEMPLATE}.tex"
+    exit 1
 fi
 
 cp "${TEMPLATES_DIR}/${RESUME_TEMPLATE}.tex" "$APP_DIR/resume.tex"
@@ -137,25 +152,40 @@ echo "✓ Created application directory: $APP_DIR"
 
 # Try to create database entry
 if command -v python3 &> /dev/null; then
-    DB_RESULT=$(python3 job_tracker/create_app_db_entry.py "$COMPANY" "$JOB_TITLE" "$DIR_NAME" $DB_ARGS 2>&1)
-    
-    if [ $? -eq 0 ] && [[ $DB_RESULT == SUCCESS* ]]; then
-        # Parse the result: SUCCESS|company_id|application_id
-        IFS='|' read -r status company_id app_id <<< "$DB_RESULT"
-        
-        # Update config with IDs
-        sed -i.bak "s/^Company ID:.*/Company ID: $company_id/" "$APP_DIR/config.txt"
-        sed -i.bak "s/^Application ID:.*/Application ID: $app_id/" "$APP_DIR/config.txt"
-        rm "$APP_DIR/config.txt.bak"
-        
-        echo "✓ Created database entry (Company ID: $company_id, Application ID: $app_id)"
-        echo "  You can view and edit this application in the job tracker UI"
+    # Determine path to create_app_db_entry.py
+    if [ -f "/app/job_tracker/create_app_db_entry.py" ]; then
+        DB_SCRIPT="/app/job_tracker/create_app_db_entry.py"
+    elif [ -f "job_tracker/create_app_db_entry.py" ]; then
+        DB_SCRIPT="job_tracker/create_app_db_entry.py"
     else
-        echo "⚠ Could not create database entry (tracker may not be running)"
-        echo "  Continuing with file-based workflow only"
-        if [[ $DB_RESULT == ERROR* ]]; then
-            echo "  Error: ${DB_RESULT#ERROR|}"
+        DB_SCRIPT=""
+    fi
+    
+    if [ -n "$DB_SCRIPT" ]; then
+        DB_RESULT=$(python3 "$DB_SCRIPT" "$COMPANY" "$JOB_TITLE" "$DIR_NAME" "${DB_ARGS[@]}" 2>&1)
+        
+        if [ $? -eq 0 ] && [[ $DB_RESULT == SUCCESS* ]]; then
+            # Parse the result: SUCCESS|company_id|application_id
+            IFS='|' read -r status company_id app_id <<< "$DB_RESULT"
+            
+            # Update config with IDs
+            sed -i.bak "s/^Company ID:.*/Company ID: $company_id/" "$APP_DIR/config.txt"
+            sed -i.bak "s/^Application ID:.*/Application ID: $app_id/" "$APP_DIR/config.txt"
+            rm "$APP_DIR/config.txt.bak"
+            
+            echo "✓ Created database entry (Company ID: $company_id, Application ID: $app_id)"
+            echo "  You can view and edit this application in the job tracker UI"
+        else
+            echo "⚠ Could not create database entry"
+            echo "  Continuing with file-based workflow only"
+            if [[ $DB_RESULT == ERROR* ]]; then
+                echo "  Error: ${DB_RESULT#ERROR|}"
+            else
+                echo "  Error: $DB_RESULT"
+            fi
         fi
+    else
+        echo "⚠ Database script not found, skipping database entry"
     fi
 else
     echo "⚠ Python3 not found, skipping database entry"

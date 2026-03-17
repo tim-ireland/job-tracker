@@ -8,12 +8,12 @@ import argparse
 from pathlib import Path
 
 # Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy.orm import Session
-from database import SessionLocal, init_db
-from crud import get_company_by_name, create_company, create_application
-from models import CompanyCreate, ApplicationCreate
+from job_tracker.database import SessionLocal, init_db
+from job_tracker.crud import get_company_by_name, create_company, create_application
+from job_tracker.models import CompanyCreate, ApplicationCreate
 
 
 def main():

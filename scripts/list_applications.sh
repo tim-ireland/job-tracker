@@ -1,7 +1,8 @@
 #!/bin/bash
 # Script to list all job applications and their status
 
-APPS_DIR="applications"
+DATA_DIR="${DATA_DIR:-.}"
+APPS_DIR="${DATA_DIR}/applications"
 
 if [ ! -d "$APPS_DIR" ]; then
     echo "No applications directory found"
