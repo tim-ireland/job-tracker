@@ -241,10 +241,10 @@ def list_application_pdfs(application_id: int, db: Session = Depends(get_db)):
     if not app_dir.exists():
         return {"pdfs": []}
     
-    # Find all files (not just PDFs)
+    # Find all PDF files
     pdfs = []
     for file_path in app_dir.iterdir():
-        if file_path.is_file() and not file_path.name.startswith('.'):
+        if file_path.is_file() and file_path.suffix.lower() == '.pdf' and not file_path.name.startswith('.'):
             pdfs.append({
                 "name": file_path.name,
                 "path": str(file_path.relative_to(APPLICATIONS_DIR)),
