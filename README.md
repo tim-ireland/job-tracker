@@ -87,16 +87,53 @@ my-job-search/              # Your data (keep private)
 
 ## Usage
 
-### Creating a New Application
+### Using the Wrapper Script (Recommended)
 
-1. Click "Add Application" in the web interface
-2. Fill in company details and job information
-3. Or use the command line:
-   ```bash
-   docker-compose exec job-tracker python scripts/create_application.sh "Company Name" "Job Title"
-   ```
+The `job-tracker` wrapper script ensures all commands run inside the container:
 
-### Generating Resumes
+```bash
+# Create a new application
+./job-tracker create Google "Senior Engineer" developer
+
+# Show customization guidance
+./job-tracker customize Google_Senior_Engineer
+
+# Compile resume and cover letter PDFs
+./job-tracker compile Google_Senior_Engineer
+
+# Sync applications to database
+./job-tracker sync
+
+# Open shell in container
+./job-tracker shell
+
+# Get help
+./job-tracker help
+```
+
+**Optional:** Add to your PATH for system-wide access:
+```bash
+echo 'export PATH="$HOME/Development/job-search-toolkit:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# Now use from anywhere
+job-tracker create Company "Job Title"
+```
+
+### Alternative: Shell Aliases
+
+For power users, add these to your `~/.bashrc` or `~/.zshrc`:
+
+```bash
+alias jt-create="docker exec -it job-search-tracker scripts/create_application.sh"
+alias jt-compile="docker exec -it job-search-tracker scripts/compile_application.sh"
+alias jt-sync="docker exec -it job-search-tracker python scripts/sync_applications.py"
+alias jt-shell="docker exec -it job-search-tracker bash"
+```
+
+See [docs/SHELL_ALIASES.md](docs/SHELL_ALIASES.md) for more options.
+
+### Creating Applications
 
 Applications are stored in your data directory at `applications/Company_JobTitle/`:
 - `job_description.txt` - The job posting
@@ -108,16 +145,14 @@ Applications are stored in your data directory at `applications/Company_JobTitle
 
 Edit the `.tex` files with your favorite editor, then compile:
 ```bash
-docker-compose exec job-tracker bash
-cd /data/applications/Company_JobTitle
-pdflatex resume.tex
+./job-tracker compile Company_JobTitle
 ```
 
 ### Syncing Applications
 
 If you create applications manually in the filesystem, sync them to the database:
 ```bash
-docker-compose exec job-tracker python scripts/sync_applications.py
+./job-tracker sync
 ```
 
 ## Configuration

@@ -8,6 +8,20 @@ import os
 from pathlib import Path
 from datetime import datetime
 
+# Container detection - warn if running outside container
+if not os.path.exists('/.dockerenv') and os.environ.get('FORCE_RUN', '0') != '1':
+    print("⚠️  WARNING: This script should be run inside the Docker container")
+    print("")
+    print("Recommended: Use the wrapper script:")
+    print("  ./job-tracker sync")
+    print("")
+    print("Or run in container:")
+    print(f"  docker exec -it job-search-tracker python {' '.join(sys.argv)}")
+    print("")
+    print(f"To force run anyway: FORCE_RUN=1 {' '.join(sys.argv)}")
+    print("")
+    sys.exit(1)
+
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 

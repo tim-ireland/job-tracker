@@ -6,6 +6,42 @@
 
 ## High Priority - Workflow Automation
 
+### 🎯 Simplify Container Workflow (CRITICAL UX)
+**Priority:** P1  
+**Estimated Time:** 1-2 hours  
+**Impact:** Prevents user confusion and errors  
+**Status:** ✅ COMPLETED
+
+**Problem:** Users may accidentally run scripts outside container, creating files in wrong location
+
+**Tasks:**
+- [x] Create wrapper script (`job-tracker`)
+- [x] Make wrapper script executable
+- [x] Add container detection to all scripts (warn if not in container)
+- [x] Update README with wrapper script usage
+- [x] Add SHELL_ALIASES.md documentation
+- [x] Update all workflow documentation to use wrapper
+
+**Testing:**
+- [x] Test wrapper script with all commands
+- [x] Test container detection warnings
+- [x] Verify scripts fail gracefully outside container
+
+**Scripts Updated with Container Detection:**
+- [x] `scripts/create_application.sh`
+- [x] `scripts/compile_application.sh`
+- [x] `scripts/customize_application.sh`
+- [x] `scripts/sync_applications.py`
+- [x] `scripts/list_applications.sh`
+
+**Documentation Updated:**
+- [x] Created `job-tracker` wrapper script
+- [x] Created `docs/SHELL_ALIASES.md` with 4 options
+- [x] Updated README.md Quick Start section
+- [x] Updated README.md Usage section
+
+---
+
 ### 🚀 Script 1: Generate Customization Prompt (HIGH IMPACT)
 **Priority:** P1  
 **Estimated Time:** 1-1.5 hours  
@@ -449,6 +485,13 @@
 ---
 
 ## Completed ✅
+
+### ✅ Simplify Container Workflow (March 18, 2026)
+- Created `job-tracker` wrapper script for easy command execution
+- Added container detection to all scripts (prevents running outside container)
+- Created comprehensive SHELL_ALIASES.md documentation
+- Updated README with wrapper script usage
+- All scripts now warn if run outside container with helpful guidance
 
 ### ✅ PDF File Filtering (March 18, 2026)
 - Modified `/api/applications/{id}/pdfs` to only show `*.pdf` files

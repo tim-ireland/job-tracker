@@ -1,6 +1,21 @@
 #!/bin/bash
 # Script to prepare customization of resume and cover letter for a specific job
 
+# Container detection - warn if running outside container
+if [ ! -f "/.dockerenv" ] && [ "${FORCE_RUN:-0}" != "1" ]; then
+    echo "⚠️  WARNING: This script should be run inside the Docker container"
+    echo ""
+    echo "Recommended: Use the wrapper script:"
+    echo "  ./job-tracker customize <application_directory_name>"
+    echo ""
+    echo "Or run in container:"
+    echo "  docker exec -it job-search-tracker scripts/$(basename $0) $*"
+    echo ""
+    echo "To force run anyway: FORCE_RUN=1 $0 $*"
+    echo ""
+    exit 1
+fi
+
 if [ $# -lt 1 ]; then
     echo "Usage: $0 <application_directory_name>"
     echo ""

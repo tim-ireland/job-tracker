@@ -1,0 +1,109 @@
+#!/bin/bash
+# Job Search Toolkit - Wrapper Script
+# This script ensures all commands run inside the Docker container
+
+set -e
+
+CONTAINER_NAME="job-search-tracker"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Check if container is running
+check_container() {
+    if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        echo "❌ Error: Container '${CONTAINER_NAME}' is not running"
+        echo ""
+        echo "Start the container with:"
+        echo "  cd ${SCRIPT_DIR}"
+        echo "  docker-compose up -d"
+        exit 1
+    fi
+}
+
+# Display usage
+usage() {
+    cat << EOF
+Job Search Toolkit - Command Wrapper
+
+Usage: $0 <command> [arguments]
+
+Commands:
+  create <Company> <Job_Title> [template]
+      Create a new job application
+      Example: $0 create Google "Senior_Engineer" developer
+
+  customize <Company_JobTitle>
+      Show customization guidance for an application
+      Example: $0 customize Google_Senior_Engineer
+
+  compile <Company_JobTitle>
+      Compile resume and cover letter PDFs
+      Example: $0 compile Google_Senior_Engineer
+
+  sync
+      Sync applications from filesystem to database
+      Example: $0 sync
+
+  shell
+      Open bash shell inside container
+      Example: $0 shell
+
+  help
+      Show this help message
+
+All commands run inside the Docker container automatically.
+Data is stored in your configured DATA_PATH directory.
+
+EOF
+}
+
+# Check container is running for commands that need it
+case "${1:-}" in
+    help|--help|-h)
+        usage
+        exit 0
+        ;;
+    shell|create|customize|compile|sync)
+        check_container
+        ;;
+esac
+
+# Execute commands
+case "${1:-}" in
+    create)
+        shift
+        docker exec -it "$CONTAINER_NAME" scripts/create_application.sh "$@"
+        ;;
+    
+    customize)
+        shift
+        docker exec -it "$CONTAINER_NAME" scripts/customize_application.sh "$@"
+        ;;
+    
+    compile)
+        shift
+        docker exec -it "$CONTAINER_NAME" scripts/compile_application.sh "$@"
+        ;;
+    
+    sync)
+        docker exec -it "$CONTAINER_NAME" python scripts/sync_applications.py
+        ;;
+    
+    shell)
+        echo "Opening shell in container. Type 'exit' to return."
+        docker exec -it "$CONTAINER_NAME" bash
+        ;;
+    
+    "")
+        echo "❌ Error: No command specified"
+        echo ""
+        usage
+        exit 1
+        ;;
+    
+    *)
+        echo "❌ Error: Unknown command '${1}'"
+        echo ""
+        usage
+        exit 1
+        ;;
+esac
