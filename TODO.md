@@ -134,6 +134,73 @@
 
 ---
 
+### 🎯 Feature: ATS Score Tracking (ANALYTICS VALUE)
+**Priority:** P2 (moved up - high analytical value)  
+**Estimated Time:** 4-6 hours  
+
+**Task:** Add ATS score tracking to database and application table
+
+**Database Changes:**
+- [ ] Add `ats_score` column to `applications` table (INTEGER, nullable)
+- [ ] Add `ats_score_date` column to `applications` table (DATETIME, nullable)
+- [ ] Add `ats_keywords_matched` column (TEXT, nullable - JSON array)
+- [ ] Add `ats_keywords_missing` column (TEXT, nullable - JSON array)
+- [ ] Optional: Create `ats_score_history` table for tracking iterations
+  - id, application_id, score, date, version, keywords_matched, keywords_missing, notes
+
+**API Endpoints:**
+- [ ] `PUT /api/applications/{id}/ats-score` - Update ATS score
+- [ ] `GET /api/applications/{id}/ats-history` - Get score history (if tracking iterations)
+- [ ] `GET /api/analytics/ats-correlation` - Analyze score vs callback rate
+
+**UI Changes:**
+- [ ] Add "ATS Score" column to applications table (sortable, filterable)
+- [ ] Color coding: 
+  - 90-100: Green (Excellent)
+  - 80-89: Blue (Good)
+  - 70-79: Yellow (Fair)
+  - <70: Red (Poor)
+- [ ] Add ATS score input field in application detail/edit view
+- [ ] Display keyword match/missing in application detail
+- [ ] Add filter: "Min ATS Score: [slider 0-100]"
+- [ ] Dashboard widget: Average ATS score by status
+- [ ] Analytics page: ATS Score vs Callback Rate chart
+
+**Analytics Features:**
+- [ ] Calculate callback rate by ATS score range:
+  - 90-100: X% callback rate
+  - 80-89: Y% callback rate
+  - 70-79: Z% callback rate
+  - <70: W% callback rate
+- [ ] Show correlation: "Applications with ATS score >85 have 2.3x higher callback rate"
+- [ ] Identify optimal score threshold for your profile
+- [ ] Track score improvements over time
+
+**Workflow Integration:**
+- [ ] After running review prompt, manually enter ATS score in UI
+- [ ] Future: Auto-parse ATS score from AI response
+- [ ] Future: API integration to auto-save score
+
+**Benefits:**
+- **Data-driven insights**: See what ATS score actually correlates with interviews
+- **Optimize effort**: Know when to stop iterating (diminishing returns)
+- **Track improvements**: See if your source material quality is improving
+- **Compare strategies**: Which template/approach yields better scores
+- **Identify patterns**: Certain companies/roles require higher scores?
+
+**Example Insights:**
+- "Your applications with ATS score >82 have a 35% callback rate vs 8% below 82"
+- "Engineering Manager roles: avg score 78, avg callback rate 22%"
+- "Developer roles: avg score 85, avg callback rate 31%"
+- "Your ATS scores improved 12 points on average over 3 months"
+
+**Migration Strategy:**
+- [ ] Add columns with ALTER TABLE (nullable for existing data)
+- [ ] Existing applications will show "N/A" for ATS score
+- [ ] Going forward, track for all new applications
+
+---
+
 ### 🎨 UI Enhancement: Auto-open PDFs After Compilation
 **Priority:** P3  
 **Estimated Time:** 15 minutes  
@@ -199,25 +266,70 @@
 
 ---
 
-### 🔮 Feature: ATS Score Tracking
-**Priority:** P4  
+### 🎯 Feature: ATS Score Tracking (ANALYTICS VALUE)
+**Priority:** P2 (moved up - high analytical value)  
 **Estimated Time:** 4-6 hours  
 
-**Task:** Add ATS score tracking to database
+**Task:** Add ATS score tracking to database and application table
 
-**Requirements:**
-- [ ] Add `ats_scores` table to database
-  - application_id, score, date, keywords_matched, keywords_missing, notes
-- [ ] Add API endpoints for CRUD operations
-- [ ] Add UI section to application detail view
-- [ ] Chart showing score history over iterations
-- [ ] Display keyword match analysis
-- [ ] Export scores to CSV
+**Database Changes:**
+- [ ] Add `ats_score` column to `applications` table (INTEGER, nullable)
+- [ ] Add `ats_score_date` column to `applications` table (DATETIME, nullable)
+- [ ] Add `ats_keywords_matched` column (TEXT, nullable - JSON array)
+- [ ] Add `ats_keywords_missing` column (TEXT, nullable - JSON array)
+- [ ] Optional: Create `ats_score_history` table for tracking iterations
+  - id, application_id, score, date, version, keywords_matched, keywords_missing, notes
+
+**API Endpoints:**
+- [ ] `PUT /api/applications/{id}/ats-score` - Update ATS score
+- [ ] `GET /api/applications/{id}/ats-history` - Get score history (if tracking iterations)
+- [ ] `GET /api/analytics/ats-correlation` - Analyze score vs callback rate
+
+**UI Changes:**
+- [ ] Add "ATS Score" column to applications table (sortable, filterable)
+- [ ] Color coding: 
+  - 90-100: Green (Excellent)
+  - 80-89: Blue (Good)
+  - 70-79: Yellow (Fair)
+  - <70: Red (Poor)
+- [ ] Add ATS score input field in application detail/edit view
+- [ ] Display keyword match/missing in application detail
+- [ ] Add filter: "Min ATS Score: [slider 0-100]"
+- [ ] Dashboard widget: Average ATS score by status
+- [ ] Analytics page: ATS Score vs Callback Rate chart
+
+**Analytics Features:**
+- [ ] Calculate callback rate by ATS score range:
+  - 90-100: X% callback rate
+  - 80-89: Y% callback rate
+  - 70-79: Z% callback rate
+  - <70: W% callback rate
+- [ ] Show correlation: "Applications with ATS score >85 have 2.3x higher callback rate"
+- [ ] Identify optimal score threshold for your profile
+- [ ] Track score improvements over time
+
+**Workflow Integration:**
+- [ ] After running review prompt, manually enter ATS score in UI
+- [ ] Future: Auto-parse ATS score from AI response
+- [ ] Future: API integration to auto-save score
 
 **Benefits:**
-- Track improvements over time
-- Compare scores across applications
-- Identify patterns in successful applications
+- **Data-driven insights**: See what ATS score actually correlates with interviews
+- **Optimize effort**: Know when to stop iterating (diminishing returns)
+- **Track improvements**: See if your source material quality is improving
+- **Compare strategies**: Which template/approach yields better scores
+- **Identify patterns**: Certain companies/roles require higher scores?
+
+**Example Insights:**
+- "Your applications with ATS score >82 have a 35% callback rate vs 8% below 82"
+- "Engineering Manager roles: avg score 78, avg callback rate 22%"
+- "Developer roles: avg score 85, avg callback rate 31%"
+- "Your ATS scores improved 12 points on average over 3 months"
+
+**Migration Strategy:**
+- [ ] Add columns with ALTER TABLE (nullable for existing data)
+- [ ] Existing applications will show "N/A" for ATS score
+- [ ] Going forward, track for all new applications
 
 ---
 
@@ -418,14 +530,19 @@
 - Script 2: 1-1.5 hours
 - Script 3: 0.5 hours
 
-**Medium Priority (P2):** ~2 hours total
+**Medium Priority (P2):** ~7-8 hours total
 - Documentation updates: 0.5 hours
 - Source material templates: 1 hour
+- **ATS Score Tracking: 4-6 hours** ⭐ HIGH VALUE
 - PDF auto-open: 0.25 hours
 
-**Total immediate work:** ~5-6 hours for 40% workflow speedup
+**Total immediate work:** ~10-12 hours for significant improvements
+- Automation scripts: 40% workflow speedup
+- ATS tracking: Data-driven application optimization
 
-**ROI:** Scripts pay for themselves after 10-15 applications
+**ROI:** 
+- Scripts pay for themselves after 10-15 applications
+- ATS tracking provides ongoing strategic insights on what works
 
 ---
 
