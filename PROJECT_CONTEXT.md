@@ -70,7 +70,11 @@ job-search-toolkit/                    # Main repository (public)
 ├── docker-compose.yml                # Service orchestration
 ├── docker-entrypoint.sh              # Container initialization
 ├── requirements.txt                  # Python dependencies
+├── PROJECT_CONTEXT.md                # Comprehensive project documentation
 └── docs/                            # Documentation
+    ├── RESUME_CUSTOMIZATION_PROMPT.md  # AI-assisted resume customization
+    ├── RESUME_REVIEW_PROMPT.md         # ATS scoring & quality check
+    └── SETUP.md                        # Setup instructions
 
 ../my-job-search-2026/               # User data directory (private)
 ├── applications/                    # Per-application directories
@@ -81,7 +85,12 @@ job-search-toolkit/                    # Main repository (public)
 │       ├── resume.pdf               # Compiled resume
 │       ├── cover_letter.tex         # Customized cover letter
 │       └── cover_letter.pdf         # Compiled cover letter
-├── source_material/                 # Personal content (experiences, skills)
+├── source_material/                 # Personal content (single source of truth)
+│   ├── experiences/                 # Work history per company
+│   ├── achievements/                # Major achievements with metrics
+│   ├── skills/                      # Technical & soft skills
+│   ├── projects/                    # Side projects, open source
+│   └── metrics/                     # Quantified results
 ├── custom_templates/                # User-specific LaTeX templates
 └── job_applications.db              # SQLite database
 ```
@@ -141,15 +150,34 @@ job-search-toolkit/                    # Main repository (public)
 
 ## Key Features & Workflows
 
-### 1. Application Management
-**Workflow:**
+### 1. Application Management with AI-Assisted Customization
+
+**Complete Workflow:**
 1. User creates application via UI or CLI (`create_application.sh`)
 2. System creates directory structure and copies LaTeX templates
 3. Database entry created with company and application records
 4. User fills in `job_description.txt` with job posting
-5. User customizes `resume.tex` and `cover_letter.tex`
-6. Compile PDFs with `compile_application.sh` or pdflatex directly
-7. Track status changes: Pipeline → Applied → Screening → Interview → Offer
+5. **NEW: AI-Assisted Customization** (recommended)
+   - Use `docs/RESUME_CUSTOMIZATION_PROMPT.md` to generate tailored resume/cover letter
+   - Conservative approach: only uses documented source material
+   - Outputs customized documents + pre-filled review prompt
+6. **NEW: ATS Scoring & Quality Check** (recommended)
+   - Use pre-filled review prompt from customization step
+   - Get ATS score (0-100), keyword analysis, writing quality feedback
+   - Iterate based on recommendations
+7. Compile PDFs with `compile_application.sh` (adds metadata)
+8. Track status changes: Pipeline → Applied → Screening → Interview → Offer
+
+**AI Customization Features:**
+- **Conservative by design**: Never fabricates experience
+- **Three-layer approach**: Role template → Base master → Source material
+- **Automatic review prompt generation**: No manual copying needed
+- **Source material driven**: Single source of truth for all customizations
+- **Validation checklists**: Verify truthfulness of every claim
+
+**Workflow Options:**
+- **AI-Assisted** (recommended): Use customization and review prompts for optimal results
+- **Manual**: Traditional approach using `customize_application.sh` helper for guidance
 
 **Status Values:**
 - Pipeline, Applied, Screening, Interview, Offer Received, Offer Accepted, Rejected, Withdrawn, Not Interested
@@ -207,10 +235,36 @@ job-search-toolkit/                    # Main repository (public)
 - `developer` - Senior engineer focus
 
 **Compilation Process:**
-1. Edit `.tex` files
+1. Edit `.tex` files (manually or via AI-assisted customization)
 2. Run `pdflatex` twice (resolves references)
 3. Add metadata with `add_pdf_metadata.py`
 4. Clean up auxiliary files (.aux, .log, .out)
+
+**AI-Assisted Enhancement:**
+- Use `docs/RESUME_CUSTOMIZATION_PROMPT.md` for intelligent customization
+- Preserves LaTeX structure while optimizing content
+- Incorporates job-specific keywords naturally
+- Maintains truthfulness through source material validation
+
+### 7. Source Material Management (NEW)
+**Purpose:** Single source of truth for AI-assisted resume customization
+
+**Structure:**
+```
+source_material/
+├── experiences/      # Work history per company (detailed)
+├── achievements/     # Major achievements with metrics
+├── skills/          # Technical & leadership skills
+├── projects/        # Side projects, open source
+└── metrics/         # Quantified results
+```
+
+**Best Practices:**
+- Document experiences as they happen
+- Use STAR format (Situation, Task, Action, Result)
+- Include specific metrics and timelines
+- Only include truthful, verifiable information
+- Update continuously for ongoing customization quality
 
 ---
 
@@ -273,24 +327,33 @@ job-search-toolkit/                    # Main repository (public)
 
 ### Session: March 17-18, 2026
 
-1. **PDF File Filtering** (March 18)
+1. **AI-Assisted Workflow Prompts** (March 18)
+   - Created `docs/RESUME_CUSTOMIZATION_PROMPT.md` - Conservative resume/cover letter customization
+   - Created `docs/RESUME_REVIEW_PROMPT.md` - ATS scoring and quality checking
+   - Customization prompt outputs pre-filled review prompt (automated workflow)
+   - Emphasis on truthfulness: only use documented source material
+   - Three-layer approach: role template → base master → source material
+   - Includes source material structure guidance and examples
+   - Validation checklists for accuracy verification
+
+2. **PDF File Filtering** (March 18)
    - Modified `/api/applications/{id}/pdfs` endpoint to only show `*.pdf` files
    - Previously showed all files (.tex, .aux, .log, etc.)
    - Changed filter from `not file_path.name.startswith('.')` to `file_path.suffix.lower() == '.pdf'`
 
-2. **Calendar View Expansion** (March 18)
+3. **Calendar View Expansion** (March 18)
    - Expanded calendar from "Next 4 Weeks" to "Last 2 Weeks & Next 3 Weeks"
    - Changed loop from `w < 4` to `w < 5`
    - Adjusted start date to go back 2 weeks: `startOfWeek.setDate(startOfWeek.getDate() - (2 * 7))`
    - Updated header text to reflect new range
 
-3. **Role Column Hyperlinks** (March 18)
+4. **Role Column Hyperlinks** (March 18)
    - Made role column in applications table a clickable hyperlink when `job_url` exists
    - Link opens in new tab with `target="_blank"`
    - Uses `event.stopPropagation()` to prevent row click event
    - Styled with underline to indicate it's a link
 
-4. **Klaviyo Application Customization** (March 17)
+5. **Klaviyo Application Customization** (March 17)
    - Customized resume and cover letter for Klaviyo Engineering Manager position
    - Emphasized developer infrastructure, CI/CD optimization, platform engineering
    - Aligned with Klaviyo's pillars: speed, quality, AI enablement
@@ -300,23 +363,104 @@ job-search-toolkit/                    # Main repository (public)
 
 ## Development Workflow
 
-### Setting Up a New Application
+### Complete Application Workflow (with AI-Assisted Customization)
 
 ```bash
-# 1. Create application directory (in container or locally)
+# STEP 1: Create application directory structure
 ./scripts/create_application.sh "Company" "Job_Title" [template_type]
 
 # Example:
 ./scripts/create_application.sh Klaviyo "Engineering_Manager" developer
+
+# This creates:
+# - applications/Company_JobTitle/
+# - config.txt (application metadata)
+# - job_description.txt (placeholder)
+# - resume.tex (from template)
+# - cover_letter.tex (from template)
+# - Database entry (company + application)
+
+# STEP 2: Fill in job description
+cd applications/Company_JobTitle
+# Edit job_description.txt - paste the full job posting
+
+# STEP 3: AI-Assisted Customization (RECOMMENDED)
+# Use the customization prompt to generate tailored documents
+
+# 3a. Gather materials:
+cat job_description.txt                      # Job posting
+cat resume.tex                               # Current template
+cat /data/templates/base_master_resume.tex   # Master resume
+find /data/source_material -name "*.md"      # Your documented experience
+
+# 3b. Open customization prompt:
+cat /app/docs/RESUME_CUSTOMIZATION_PROMPT.md
+
+# 3c. Fill in the prompt template with your materials
+
+# 3d. Send to AI assistant (Claude, GitHub Copilot, ChatGPT)
+
+# 3e. Review output carefully:
+#     - Verify all claims are truthful and documented
+#     - Check metrics are accurate
+#     - Ensure no fabricated experience
+
+# 3f. Save outputs:
+#     - SECTION 1 → resume.tex (customized resume)
+#     - SECTION 2 → cover_letter.tex (customized cover letter)
+#     - SECTION 3 → review_prompt.txt (pre-filled review prompt)
+
+# STEP 4: Compile and review PDFs
+pdflatex resume.tex && pdflatex resume.tex
+pdflatex cover_letter.tex && pdflatex cover_letter.tex
+open resume.pdf cover_letter.pdf
+
+# STEP 5: ATS Scoring and Quality Check (RECOMMENDED)
+# Use the pre-filled review prompt from Step 3f
+
+# 5a. Send review_prompt.txt to AI assistant
+
+# 5b. Review ATS score and feedback:
+#     - Overall ATS score (target: 80+)
+#     - Missing keywords
+#     - Writing quality issues
+#     - Prioritized recommendations
+
+# 5c. Make improvements based on feedback
+
+# 5d. Re-compile and re-check if needed:
+pdflatex resume.tex && pdflatex resume.tex
+# Optionally re-run review prompt to verify improvements
+
+# STEP 6: Final compilation with metadata
+cd ../..
+./scripts/compile_application.sh Company_JobTitle
+# This adds PDF metadata (company, role, version)
+
+# STEP 7: Track and submit
+# Update application status in web UI at http://localhost:8000
+# - Set status to "Applied" when submitted
+# - Add date_applied
+# - Track any interactions, interviews, offers
+```
+
+### Alternative: Manual Customization Workflow
+
+```bash
+# If you prefer manual customization without AI assistance:
+
+# 1. Create application directory
+./scripts/create_application.sh "Company" "Job_Title" [template_type]
 
 # 2. Edit job_description.txt with actual job posting
 
 # 3. Run customize helper (shows guidance)
 ./scripts/customize_application.sh Company_Job_Title
 
-# 4. Customize resume.tex and cover_letter.tex
-# - Can use AI assistance (GitHub Copilot, LLMs)
-# - Tailor to job description keywords and requirements
+# 4. Manually customize resume.tex and cover_letter.tex
+# - Review job_description.txt for keywords
+# - Tailor content to job requirements
+# - Use your source_material/ for accurate details
 
 # 5. Compile PDFs
 ./scripts/compile_application.sh Company_Job_Title
@@ -326,6 +470,36 @@ pdflatex resume.tex && pdflatex resume.tex
 pdflatex cover_letter.tex && pdflatex cover_letter.tex
 
 # 6. Track in web UI at http://localhost:8000
+```
+
+### Source Material Management
+
+Your `source_material/` directory is the single source of truth for AI customization:
+
+```bash
+# Recommended structure:
+/data/source_material/
+├── experiences/
+│   ├── company1.md          # Detailed work history per company
+│   ├── company2.md
+│   └── company3.md
+├── achievements/
+│   ├── achievement1.md      # Major achievements with context, metrics
+│   ├── achievement2.md
+│   └── achievement3.md
+├── skills/
+│   ├── technical_skills.md  # Languages, frameworks, tools
+│   ├── leadership_skills.md # People management, mentoring
+│   └── certifications.md
+├── projects/
+│   └── notable_projects.md  # Side projects, open source
+└── metrics/
+    └── quantified_results.md # Numbers, percentages, scale
+
+# Best practice: Document experiences as they happen
+# - More specific = better AI customization
+# - Only include truthful, verifiable information
+# - Use STAR format (Situation, Task, Action, Result)
 ```
 
 ### Syncing Filesystem to Database
@@ -635,13 +809,16 @@ Recent commits (newest first):
 - Salary expectations and offers
 - Interview notes and feedback
 - Company contacts and relationships
+- **Source material**: Detailed work history and achievements (private)
 
 ### Recommendations
 - Keep data directory in private git repo (separate from code)
 - Regular backups of SQLite database
 - Don't commit data directory to public repos
+- **Especially important**: Keep source_material/ directory private (contains detailed career information)
 - Consider encrypting data directory at rest
 - Use environment variables for any API keys (if added)
+- Never share source material publicly (even excerpts can reveal sensitive info)
 
 ---
 
@@ -730,6 +907,34 @@ docker-compose exec job-tracker python scripts/sync_applications.py
 **Cause:** Syntax errors in .tex file, missing packages  
 **Fix:** Check .log file, run with `-interaction=nonstopmode`, install missing packages
 
+### AI Customization Issues
+
+#### Issue: AI Adds Experience I Don't Have
+**Symptom:** Customized resume includes skills or achievements not in source material  
+**Cause:** AI inferring or creating content  
+**Fix:** 
+- Review every claim against source material
+- Explicitly tell AI to use only documented content
+- Flag the issue and regenerate with stricter instructions
+
+#### Issue: Low ATS Score
+**Symptom:** Review prompt returns score below 70  
+**Cause:** Missing keywords, weak alignment with job requirements  
+**Fix:** 
+1. Review missing keywords in ATS feedback
+2. Check if you actually have that experience in source material
+3. If yes: add to resume using their terminology
+4. If no: consider if role is good fit or if you need to gain experience first
+
+#### Issue: Source Material Incomplete
+**Symptom:** Can't find documented experience for job requirements  
+**Cause:** Haven't documented work history thoroughly  
+**Fix:** 
+1. Pause application process
+2. Document experiences with specific details and metrics
+3. Use STAR format (Situation, Task, Action, Result)
+4. Come back to customization once documentation is complete
+
 ---
 
 ## Performance Characteristics
@@ -788,6 +993,10 @@ docker-compose exec job-tracker python scripts/sync_applications.py
 3. Implement WebSocket for real-time updates
 4. Add caching layer (Redis)
 5. Microservices for document generation
+6. **AI Integration**: Embed customization/review prompts directly in UI
+7. **Source Material Editor**: Web-based interface for managing source_material/
+8. **Version History**: Track resume versions and ATS scores over time
+9. **A/B Testing**: Compare different resume versions for same role
 
 ---
 
@@ -865,6 +1074,16 @@ Plain text format containing:
 - Nice to have
 - Benefits
 - Location and remote policy
+
+### source_material/*.md
+Markdown files documenting your actual work experience:
+- **experiences/company_name.md**: Detailed work history, responsibilities, context
+- **achievements/achievement_name.md**: Major accomplishments with STAR format
+- **skills/skill_category.md**: Technical/leadership skills with proficiency levels
+- **projects/project_name.md**: Side projects, open source contributions
+- **metrics/quantified_results.md**: Specific numbers, percentages, scale
+
+**Critical**: Only include truthful, verifiable information. This is used by AI customization prompts.
 
 ### Database Schema (SQLite)
 See section "Database Schema" above for detailed table structures.
