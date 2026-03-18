@@ -212,13 +212,15 @@ function displayCalendarView() {
         return;
     }
     
-    // Simple week view
+    // Simple week view - show last 2 weeks and next 3 weeks
     const today = new Date();
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay());
+    // Go back 2 weeks from the current week
+    startOfWeek.setDate(startOfWeek.getDate() - (2 * 7));
     
     const weeks = [];
-    for (let w = 0; w < 4; w++) {
+    for (let w = 0; w < 5; w++) {
         const week = [];
         for (let d = 0; d < 7; d++) {
             const date = new Date(startOfWeek);
@@ -238,7 +240,7 @@ function displayCalendarView() {
     container.innerHTML = `
         <div class="calendar-view">
             <div class="calendar-header">
-                <h3>Next 4 Weeks</h3>
+                <h3>Last 2 Weeks & Next 3 Weeks</h3>
             </div>
             
             <div class="calendar-grid">

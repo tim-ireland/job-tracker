@@ -289,10 +289,13 @@ function updateApplicationList() {
     tbody.innerHTML = filteredApps.map(app => {
         const company = companies.find(c => c.id === app.company_id);
         const companyName = company ? company.name : 'Unknown';
+        const roleDisplay = app.job_url 
+            ? `<a href="${escapeHtml(app.job_url)}" target="_blank" onclick="event.stopPropagation()" style="color: inherit; text-decoration: underline;">${escapeHtml(app.role)}</a>`
+            : escapeHtml(app.role);
         return `
             <tr onclick="viewApplication(${app.id})" style="cursor: pointer;">
                 <td><strong>${escapeHtml(companyName)}</strong></td>
-                <td>${escapeHtml(app.role)}</td>
+                <td>${roleDisplay}</td>
                 <td><span class="badge badge-${app.priority.toLowerCase()}">${app.priority}</span></td>
                 <td><span class="badge badge-${app.status.toLowerCase()}">${app.status}</span></td>
                 <td>${app.salary_range ? escapeHtml(app.salary_range) : '-'}</td>
