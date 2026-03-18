@@ -847,8 +847,8 @@ open http://localhost:8000/docs
 ### config.txt
 ```
 # Application Configuration
-Company: Klaviyo
-Job Title: Engineering Manager
+Company: Sprocket Co. 
+Job Title: Software Engineer
 Template Type: developer
 Date Created: 2026-03-17
 Status: Pipeline
