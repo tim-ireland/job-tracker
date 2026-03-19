@@ -953,28 +953,18 @@ def bulk_import_applications(urls: List[str] = Body(..., embed=True), db: Sessio
             if not company:
                 company = crud.create_company(db, models.CompanyCreate(name=company_name))
             
-            # Create application
-            application = crud.create_application(db, models.ApplicationCreate(
-                company_id=company.id,
-                role=role,
-                job_url=url,
-                status="Pipeline",
-                priority="P3",
-                salary_range=salary_range
-            ))
-            
             # Create application directory
             company_name_clean = company_name.replace(' ', '_')
             role_clean = role.replace(' ', '_').replace('/', '_')
             app_dir = APPLICATIONS_DIR / f"{company_name_clean}_{role_clean}"
             app_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Extract main content from the page
             # Try to find the main job description content
             job_content = ""
-            
+
             # Try common job description containers
-            for selector in ['article', 'main', '.job-description', '#job-description', 
+            for selector in ['article', 'main', '.job-description', '#job-description',
                            '.description', '[class*="description"]', '[class*="job"]']:
                 content_elem = soup.select_one(selector)
                 if content_elem:
@@ -983,13 +973,13 @@ def bulk_import_applications(urls: List[str] = Body(..., embed=True), db: Sessio
                     if len(text) > 200:  # Only use if substantial content
                         job_content = text
                         break
-            
+
             # Fallback: get all text from body if no specific container found
             if not job_content:
                 body = soup.find('body')
                 if body:
                     job_content = body.get_text(separator='\n', strip=True)
-            
+
             # Try to extract salary range from content
             salary_range = None
             if job_content:
@@ -1017,7 +1007,17 @@ def bulk_import_applications(urls: List[str] = Body(..., embed=True), db: Sessio
                             break
                         except (ValueError, IndexError):
                             continue
-            
+
+            # Create application
+            application = crud.create_application(db, models.ApplicationCreate(
+                company_id=company.id,
+                role=role,
+                job_url=url,
+                status="Pipeline",
+                priority="P3",
+                salary_range=salary_range
+            ))
+
             # Save job description with URL and scraped content
             job_desc_path = app_dir / "job_description.txt"
             with open(job_desc_path, 'w', encoding='utf-8') as f:
