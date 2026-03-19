@@ -486,6 +486,63 @@
 
 ## Completed ✅
 
+### ✅ Bulk Job Scoring System (March 19, 2026)
+**Complete end-to-end scoring system for evaluating job fit!**
+
+**Phase 1 - Database Migration:**
+- Added Alembic for database migrations
+- Created migration adding 6 new match scoring fields to applications table
+- Fields: match_score, match_reasoning, match_strengths, match_gaps, match_recommendation, evaluated_at
+- Added `migrate` command to job-tracker wrapper
+
+**Phase 2 - Scoring Engine:**
+- Created `job_tracker/scoring.py` module with JobScorer class
+- Generates bulk scoring prompts with candidate background + job descriptions
+- Parses AI responses (handles markdown-wrapped JSON)
+- Loads resume summary and source material for context
+- Returns database-ready format with timestamps
+- Created comprehensive documentation in `docs/BULK_JOB_SCORING_PROMPT.md`
+
+**Phase 3 - Backend API:**
+- Added 3 new API endpoints:
+  - `POST /api/applications/bulk-score` - Generate scoring prompt for Pipeline jobs
+  - `POST /api/applications/parse-scores` - Parse AI response and update database
+  - `POST /api/applications/{id}/score` - Score single application
+- Updated Pydantic models to include match_score fields
+- All endpoints tested and working
+
+**Phase 4 - Frontend UI:**
+- Added Actions dropdown menu replacing single "Add Application" button
+- Created 3-step bulk scoring modal workflow
+- Added Match Score column to applications table (between Role and Priority)
+- Color-coded badges: Green (80-100), Blue (70-79), Yellow (60-69), Orange (50-59), Red (<50)
+- Clickable badges show details (score, reasoning, strengths, gaps)
+- Sortable match score column
+- Added dropdown and badge styles to CSS
+- Implemented complete JavaScript workflow handlers
+
+**How It Works:**
+1. User clicks "Actions" → "Score Pipeline Jobs"
+2. System generates prompt with all Pipeline applications + candidate background
+3. User copies prompt, pastes into Claude/ChatGPT/local LLM
+4. AI returns JSON with scores, reasoning, strengths, gaps for each job
+5. User pastes response back, system parses and updates database
+6. Match scores appear in table with color-coded badges
+7. Click badge to see full details
+
+**Benefits:**
+- **Time Savings:** Score 40 jobs in 30 minutes vs 5-10 hours manual review
+- **Data-Driven:** Prioritize high-scoring matches
+- **Strategic Insights:** Pattern recognition on what roles fit best
+- **Focus Effort:** Customize only top-scoring applications
+
+**Files Created/Modified:**
+- Database: Added match_score fields via Alembic migration
+- Backend: `job_tracker/scoring.py`, updated `job_tracker/app.py`, `job_tracker/models.py`
+- Frontend: Updated `templates/index.html`, `static/style.css`, `static/app.js`
+- Documentation: `docs/BULK_JOB_SCORING_PROMPT.md`
+- Infrastructure: `alembic.ini`, `alembic/env.py`, `alembic/script.py.mako`
+
 ### ✅ Simplify Container Workflow (March 18, 2026)
 - Created `job-tracker` wrapper script for easy command execution
 - Added container detection to all scripts (prevents running outside container)
