@@ -624,6 +624,15 @@
                 
                 <div id="scoringStep1" style="display: block;">
                     <h3 style="margin-bottom: 15px;"><i class="fas fa-1"></i> Step 1: Generate Prompt</h3>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="rescoreCheckbox" style="width: auto;">
+                            <span>Re-score already evaluated applications</span>
+                        </label>
+                        <p style="color: var(--text-secondary); font-size: 0.85em; margin-top: 5px; margin-left: 24px;">
+                            By default, only applications without scores are included. Check this to re-evaluate all Pipeline jobs.
+                        </p>
+                    </div>
                     <button class="btn btn-primary" id="generatePromptBtn">
                         <i class="fas fa-magic"></i> Generate Scoring Prompt
                     </button>

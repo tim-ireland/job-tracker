@@ -107,10 +107,20 @@ function sortApplications() {
                 aVal = a.role.toLowerCase();
                 bVal = b.role.toLowerCase();
                 break;
+            case 'match_score':
+                aVal = a.match_score || 0;
+                bVal = b.match_score || 0;
+                break;
             case 'priority':
-                // P1 < P2 < P3 < P4
-                aVal = parseInt(a.priority.replace('P', ''));
-                bVal = parseInt(b.priority.replace('P', ''));
+                // P1 < P2 < P3 < P4 < P5
+                // Handle both "P1" format and other text (e.g., "Medium")
+                const parsePriority = (p) => {
+                    if (!p) return 999;
+                    const match = p.match(/P(\d+)/);
+                    return match ? parseInt(match[1]) : 999;
+                };
+                aVal = parsePriority(a.priority);
+                bVal = parsePriority(b.priority);
                 break;
             case 'status':
                 aVal = a.status.toLowerCase();
@@ -908,6 +918,20 @@ document.getElementById('scorePipelineBtn')?.addEventListener('click', () => {
 // Bulk Import button
 document.getElementById('bulkImportBtn')?.addEventListener('click', () => {
     document.getElementById('actionsDropdownMenu').style.display = 'none';
+    
+    // Reset modal state
+    const form = document.getElementById('bulkImportForm');
+    const cancelBtn = form.querySelector('button.btn-secondary');
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const progress = document.getElementById('bulkImportProgress');
+    const results = document.getElementById('bulkImportResults');
+    
+    cancelBtn.innerHTML = '<i class="fas fa-times"></i> Cancel';
+    submitBtn.style.display = '';
+    submitBtn.disabled = false;
+    progress.style.display = 'none';
+    results.style.display = 'none';
+    
     openModal('bulkImportModal');
 });
 
@@ -925,6 +949,7 @@ function resetScoringModal() {
 document.getElementById('generatePromptBtn')?.addEventListener('click', async () => {
     const btn = document.getElementById('generatePromptBtn');
     const status = document.getElementById('promptStatus');
+    const rescore = document.getElementById('rescoreCheckbox').checked;
     
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
@@ -935,7 +960,11 @@ document.getElementById('generatePromptBtn')?.addEventListener('click', async ()
         const response = await fetch(`${API_BASE}/applications/bulk-score`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status_filter: 'Pipeline', use_api: false })
+            body: JSON.stringify({ 
+                status_filter: 'Pipeline', 
+                use_api: false,
+                rescore: rescore
+            })
         });
         
         if (!response.ok) {
@@ -1170,6 +1199,11 @@ document.getElementById('bulkImportForm')?.addEventListener('submit', async (e) 
         // Clear form
         textarea.value = '';
         
+        // Change buttons after completion
+        const cancelBtn = e.target.querySelector('button.btn-secondary');
+        cancelBtn.innerHTML = '<i class="fas fa-check"></i> Close';
+        submitBtn.style.display = 'none';
+        
         // Reload applications if any were created
         if (data.summary.created > 0) {
             setTimeout(() => {
@@ -1182,6 +1216,11 @@ document.getElementById('bulkImportForm')?.addEventListener('submit', async (e) 
         progress.style.display = 'none';
         results.style.display = 'block';
         results.innerHTML = `<div class="alert alert-danger"><i class="fas fa-times-circle"></i> Error: ${error.message}</div>`;
+        
+        // Change buttons on error too
+        const cancelBtn = e.target.querySelector('button.btn-secondary');
+        cancelBtn.innerHTML = '<i class="fas fa-times"></i> Close';
+        submitBtn.style.display = 'none';
     } finally {
         submitBtn.disabled = false;
     }

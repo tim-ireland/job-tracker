@@ -702,6 +702,7 @@ from .scoring import JobScorer
 class BulkScoreRequest(BaseModel):
     status_filter: Optional[str] = "Pipeline"
     use_api: bool = False
+    rescore: bool = False  # If True, re-score already scored applications
 
 class ParseScoresRequest(BaseModel):
     ai_response: str
@@ -711,6 +712,9 @@ class ParseScoresRequest(BaseModel):
 def bulk_score_applications(request: BulkScoreRequest, db: Session = Depends(get_db)):
     """
     Generate bulk scoring prompt for Pipeline applications.
+    
+    By default, skips applications that already have match_score.
+    Set rescore=True to re-evaluate already-scored applications.
     
     Returns prompt to copy-paste into AI, or (future) calls AI API directly.
     """
@@ -723,6 +727,16 @@ def bulk_score_applications(request: BulkScoreRequest, db: Session = Depends(get
             status_code=404, 
             detail=f"No applications found with status '{request.status_filter}'"
         )
+    
+    # Filter out already-scored applications unless rescore is True
+    if not request.rescore:
+        applications = [app for app in applications if app.match_score is None]
+        
+        if not applications:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No unscored applications found with status '{request.status_filter}'. Set rescore=true to re-evaluate."
+            )
     
     # Load job descriptions and build application data
     app_data = []
@@ -945,7 +959,7 @@ def bulk_import_applications(urls: List[str] = Body(..., embed=True), db: Sessio
                 role=role,
                 job_url=url,
                 status="Pipeline",
-                priority="Medium"
+                priority="P3"
             ))
             
             # Create application directory
@@ -954,26 +968,50 @@ def bulk_import_applications(urls: List[str] = Body(..., embed=True), db: Sessio
             app_dir = APPLICATIONS_DIR / f"{company_name_clean}_{role_clean}"
             app_dir.mkdir(parents=True, exist_ok=True)
             
-            # Save job description URL
+            # Extract main content from the page
+            # Try to find the main job description content
+            job_content = ""
+            
+            # Try common job description containers
+            for selector in ['article', 'main', '.job-description', '#job-description', 
+                           '.description', '[class*="description"]', '[class*="job"]']:
+                content_elem = soup.select_one(selector)
+                if content_elem:
+                    # Get text and clean it up
+                    text = content_elem.get_text(separator='\n', strip=True)
+                    if len(text) > 200:  # Only use if substantial content
+                        job_content = text
+                        break
+            
+            # Fallback: get all text from body if no specific container found
+            if not job_content:
+                body = soup.find('body')
+                if body:
+                    job_content = body.get_text(separator='\n', strip=True)
+            
+            # Save job description with URL and scraped content
             job_desc_path = app_dir / "job_description.txt"
-            with open(job_desc_path, 'w') as f:
+            with open(job_desc_path, 'w', encoding='utf-8') as f:
                 f.write(f"Job URL: {url}\n\n")
-                f.write("# Paste the job description here\n\n")
-                f.write("## Company Information\n")
-                f.write("[Company background, mission, values]\n\n")
-                f.write("## Role Description\n")
-                f.write("[Role summary]\n\n")
-                f.write("## Responsibilities\n")
-                f.write("- [Responsibility 1]\n")
-                f.write("- [Responsibility 2]\n\n")
-                f.write("## Requirements\n")
-                f.write("- [Requirement 1]\n")
-                f.write("- [Requirement 2]\n\n")
-                f.write("## Nice to Have\n")
-                f.write("- [Nice to have 1]\n")
-                f.write("- [Nice to have 2]\n\n")
-                f.write("## Benefits\n")
-                f.write("[Benefits information]\n")
+                if job_content:
+                    f.write(job_content)
+                else:
+                    f.write("# Paste the job description here\n\n")
+                    f.write("## Company Information\n")
+                    f.write("[Company background, mission, values]\n\n")
+                    f.write("## Role Description\n")
+                    f.write("[Role summary]\n\n")
+                    f.write("## Responsibilities\n")
+                    f.write("- [Responsibility 1]\n")
+                    f.write("- [Responsibility 2]\n\n")
+                    f.write("## Requirements\n")
+                    f.write("- [Requirement 1]\n")
+                    f.write("- [Requirement 2]\n\n")
+                    f.write("## Nice to Have\n")
+                    f.write("- [Nice to have 1]\n")
+                    f.write("- [Nice to have 2]\n\n")
+                    f.write("## Benefits\n")
+                    f.write("[Benefits information]\n")
             
             results["created"].append({
                 "id": application.id,
