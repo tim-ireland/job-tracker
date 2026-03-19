@@ -959,7 +959,8 @@ def bulk_import_applications(urls: List[str] = Body(..., embed=True), db: Sessio
                 role=role,
                 job_url=url,
                 status="Pipeline",
-                priority="P3"
+                priority="P3",
+                salary_range=salary_range
             ))
             
             # Create application directory
@@ -988,6 +989,34 @@ def bulk_import_applications(urls: List[str] = Body(..., embed=True), db: Sessio
                 body = soup.find('body')
                 if body:
                     job_content = body.get_text(separator='\n', strip=True)
+            
+            # Try to extract salary range from content
+            salary_range = None
+            if job_content:
+                # Common salary patterns
+                salary_patterns = [
+                    r'\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*[-–—to]\s*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',  # $100,000 - $150,000
+                    r'(\d{1,3})k?\s*[-–—to]\s*(\d{1,3})k',  # 100k - 150k
+                    r'salary.*?\$\s*(\d{1,3}(?:,\d{3})*)',  # salary: $120,000
+                ]
+                
+                for pattern in salary_patterns:
+                    match = re.search(pattern, job_content, re.IGNORECASE)
+                    if match:
+                        try:
+                            if len(match.groups()) == 2:
+                                min_sal = match.group(1).replace(',', '')
+                                max_sal = match.group(2).replace(',', '')
+                                # Handle 'k' notation (e.g., 100k)
+                                if 'k' in pattern.lower():
+                                    min_sal = str(int(min_sal) * 1000)
+                                    max_sal = str(int(max_sal) * 1000)
+                                salary_range = f"${min_sal} - ${max_sal}"
+                            else:
+                                salary_range = f"${match.group(1)}"
+                            break
+                        except (ValueError, IndexError):
+                            continue
             
             # Save job description with URL and scraped content
             job_desc_path = app_dir / "job_description.txt"
@@ -1018,6 +1047,7 @@ def bulk_import_applications(urls: List[str] = Body(..., embed=True), db: Sessio
                 "company": company_name,
                 "role": role,
                 "url": url,
+                "salary_range": salary_range,
                 "directory": str(app_dir.relative_to(APPLICATIONS_DIR))
             })
             
