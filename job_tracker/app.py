@@ -693,3 +693,181 @@ def get_dua_range_report_csv(start_date: str, end_date: str, db: Session = Depen
             "Content-Disposition": f"attachment; filename=dua_range_{start.strftime('%Y%m%d')}_{end.strftime('%Y%m%d')}.csv"
         }
     )
+
+
+# ==================== BULK JOB SCORING ENDPOINTS ====================
+
+from .scoring import JobScorer
+
+class BulkScoreRequest(BaseModel):
+    status_filter: Optional[str] = "Pipeline"
+    use_api: bool = False
+
+class ParseScoresRequest(BaseModel):
+    ai_response: str
+
+
+@app.post("/api/applications/bulk-score")
+def bulk_score_applications(request: BulkScoreRequest, db: Session = Depends(get_db)):
+    """
+    Generate bulk scoring prompt for Pipeline applications.
+    
+    Returns prompt to copy-paste into AI, or (future) calls AI API directly.
+    """
+    
+    # Get applications with specified status
+    applications = crud.get_applications(db, status=request.status_filter, limit=1000)
+    
+    if not applications:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"No applications found with status '{request.status_filter}'"
+        )
+    
+    # Load job descriptions and build application data
+    app_data = []
+    for app in applications:
+        # Get application directory
+        company_name = app.company.name.replace(' ', '_')
+        role = app.role.replace(' ', '_').replace('/', '_')
+        app_dir = APPLICATIONS_DIR / f"{company_name}_{role}"
+        job_desc_path = app_dir / "job_description.txt"
+        
+        # Load job description if exists
+        job_description = ""
+        if job_desc_path.exists():
+            with open(job_desc_path, 'r') as f:
+                job_description = f.read()
+        
+        app_data.append({
+            'id': app.id,
+            'company': app.company.name,
+            'role': app.role,
+            'location': app.location or 'Not specified',
+            'job_url': app.job_url or 'Not provided',
+            'job_description': job_description or 'No job description found'
+        })
+    
+    # Generate prompt
+    scorer = JobScorer(data_dir=DATA_DIR)
+    prompt = scorer.generate_bulk_prompt(app_data)
+    
+    if request.use_api:
+        # Future: Call AI API here
+        return {
+            "message": "API integration not yet implemented",
+            "prompt": prompt,
+            "application_count": len(app_data)
+        }
+    
+    # Return prompt for manual copy-paste
+    return {
+        "prompt": prompt,
+        "application_count": len(app_data),
+        "applications": [{'id': a['id'], 'company': a['company'], 'role': a['role']} for a in app_data]
+    }
+
+
+@app.post("/api/applications/parse-scores")
+def parse_scoring_response(request: ParseScoresRequest, db: Session = Depends(get_db)):
+    """
+    Parse AI scoring response and update database with scores.
+    
+    Expects JSON response from AI with evaluations array.
+    """
+    
+    try:
+        scorer = JobScorer(data_dir=DATA_DIR)
+        results = scorer.parse_scores(request.ai_response)
+        
+        if not results:
+            raise HTTPException(status_code=400, detail="No evaluations found in response")
+        
+        # Update database
+        updated = 0
+        failed = 0
+        errors = []
+        
+        for result in results:
+            try:
+                app_id = result['application_id']
+                
+                # Get application
+                application = crud.get_application(db, app_id)
+                if not application:
+                    errors.append(f"Application {app_id} not found")
+                    failed += 1
+                    continue
+                
+                # Update with scores
+                application.match_score = result['match_score']
+                application.match_reasoning = result['match_reasoning']
+                application.match_strengths = result['match_strengths']
+                application.match_gaps = result['match_gaps']
+                application.match_recommendation = result['match_recommendation']
+                application.evaluated_at = datetime.fromisoformat(result['evaluated_at'])
+                
+                db.commit()
+                updated += 1
+                
+            except Exception as e:
+                errors.append(f"Application {result.get('application_id', 'unknown')}: {str(e)}")
+                failed += 1
+                db.rollback()
+        
+        return {
+            "updated": updated,
+            "failed": failed,
+            "errors": errors if errors else None
+        }
+    
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse scores: {str(e)}")
+
+
+@app.post("/api/applications/{application_id}/score")
+def score_single_application(application_id: int, db: Session = Depends(get_db)):
+    """
+    Generate scoring prompt for a single application.
+    
+    Useful for re-scoring individual jobs or scoring new applications.
+    """
+    
+    application = crud.get_application(db, application_id)
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    # Get job description
+    company_name = application.company.name.replace(' ', '_')
+    role = application.role.replace(' ', '_').replace('/', '_')
+    app_dir = APPLICATIONS_DIR / f"{company_name}_{role}"
+    job_desc_path = app_dir / "job_description.txt"
+    
+    job_description = ""
+    if job_desc_path.exists():
+        with open(job_desc_path, 'r') as f:
+            job_description = f.read()
+    
+    app_data = [{
+        'id': application.id,
+        'company': application.company.name,
+        'role': application.role,
+        'location': application.location or 'Not specified',
+        'job_url': application.job_url or 'Not provided',
+        'job_description': job_description or 'No job description found'
+    }]
+    
+    # Generate prompt for single application
+    scorer = JobScorer(data_dir=DATA_DIR)
+    prompt = scorer.generate_bulk_prompt(app_data)
+    
+    return {
+        "prompt": prompt,
+        "application": {
+            "id": application.id,
+            "company": application.company.name,
+            "role": application.role
+        }
+    }
