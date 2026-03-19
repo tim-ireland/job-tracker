@@ -344,7 +344,7 @@ function updateApplicationList() {
                 <td>${app.salary_range ? escapeHtml(app.salary_range) : '-'}</td>
                 <td>${app.date_applied ? new Date(app.date_applied).toLocaleDateString() : '-'}</td>
                 <td onclick="event.stopPropagation()">
-                    <button class="btn btn-secondary btn-sm" onclick="editApplication(${app.id})">
+                    <button class="btn btn-info btn-sm" onclick="editApplication(${app.id})">
                         <i class="fas fa-edit"></i> Edit
                     </button>
                     <button class="btn btn-danger btn-sm" onclick="deleteApplication(${app.id})">

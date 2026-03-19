@@ -350,6 +350,17 @@ body {
     border-color: var(--gray-7);
 }
 
+.btn-info {
+    background: #5ba4d8;
+    color: white;
+    border-color: #5ba4d8;
+}
+
+.btn-info:hover {
+    background: #3d8fc8;
+    border-color: #3d8fc8;
+}
+
 .btn-danger {
     background: rgba(220, 50, 47, 0.15);
     color: var(--sol-red);
