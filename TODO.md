@@ -680,3 +680,36 @@
 ---
 
 *This TODO file should be updated as tasks are completed or priorities change.*
+
+## Bulk Import Feature - Completed
+
+### Implementation Summary
+✅ Backend API endpoint `/api/applications/bulk-import`
+   - Accepts array of URLs
+   - Validates and skips LinkedIn job posting URLs
+   - Attempts to extract company name and role from page title
+   - Creates company if it doesn't exist
+   - Creates application entry in database
+   - Creates application directory structure
+   - Generates job_description.txt template
+
+✅ Frontend UI
+   - Bulk Import button in Actions dropdown
+   - Modal with URL textarea input
+   - LinkedIn URL warning
+   - Progress indicator during import
+   - Detailed results display (created, skipped, failed)
+   - Auto-refresh applications table after successful import
+
+### How to Use
+1. Click "Actions" → "Bulk Import URLs"
+2. Paste job URLs (one per line)
+3. Click "Import"
+4. Review results
+5. Edit job_description.txt files with actual content
+6. Run "Score Pipeline Jobs" to evaluate matches
+
+### Next Steps
+- Consider adding automatic job description scraping
+- Add retry mechanism for failed URLs
+- Support for more URL patterns/formats

@@ -871,3 +871,129 @@ def score_single_application(application_id: int, db: Session = Depends(get_db))
             "role": application.role
         }
     }
+
+
+@app.post("/api/applications/bulk-import")
+def bulk_import_applications(urls: List[str] = Body(..., embed=True), db: Session = Depends(get_db)):
+    """
+    Bulk import applications from a list of URLs.
+    
+    Validates URLs and skips LinkedIn job posting URLs.
+    Creates application entries and directories for valid URLs.
+    """
+    import re
+    import urllib.request
+    from bs4 import BeautifulSoup
+    
+    results = {
+        "created": [],
+        "skipped": [],
+        "failed": []
+    }
+    
+    # LinkedIn URL patterns to skip
+    linkedin_patterns = [
+        r'linkedin\.com/jobs/',
+        r'linkedin\.com/job/',
+        r'linkedin\.com/.*jobs/view/'
+    ]
+    
+    for url in urls:
+        url = url.strip()
+        if not url:
+            continue
+            
+        # Check if it's a LinkedIn URL
+        is_linkedin = any(re.search(pattern, url, re.IGNORECASE) for pattern in linkedin_patterns)
+        if is_linkedin:
+            results["skipped"].append({
+                "url": url,
+                "reason": "LinkedIn job posting URLs are not supported. Please use the company's direct application page."
+            })
+            continue
+        
+        try:
+            # Try to fetch the page and extract company name and role
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            req = urllib.request.Request(url, headers=headers)
+            
+            with urllib.request.urlopen(req, timeout=10) as response:
+                html = response.read()
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                # Try to extract title (role)
+                title = soup.find('title')
+                role = title.get_text().strip() if title else "Unknown Role"
+                
+                # Clean up common title patterns
+                role = re.sub(r'\s*[-|]\s*.*$', '', role)  # Remove "- Company Name" suffix
+                role = role[:100]  # Limit length
+                
+                # Try to extract company from URL domain
+                from urllib.parse import urlparse
+                domain = urlparse(url).netloc
+                company_name = domain.replace('www.', '').split('.')[0].title()
+                
+            # Check if company exists, create if not
+            company = crud.get_company_by_name(db, company_name)
+            if not company:
+                company = crud.create_company(db, models.CompanyCreate(name=company_name))
+            
+            # Create application
+            application = crud.create_application(db, models.ApplicationCreate(
+                company_id=company.id,
+                role=role,
+                job_url=url,
+                status="Pipeline",
+                priority="Medium"
+            ))
+            
+            # Create application directory
+            company_name_clean = company_name.replace(' ', '_')
+            role_clean = role.replace(' ', '_').replace('/', '_')
+            app_dir = APPLICATIONS_DIR / f"{company_name_clean}_{role_clean}"
+            app_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Save job description URL
+            job_desc_path = app_dir / "job_description.txt"
+            with open(job_desc_path, 'w') as f:
+                f.write(f"Job URL: {url}\n\n")
+                f.write("# Paste the job description here\n\n")
+                f.write("## Company Information\n")
+                f.write("[Company background, mission, values]\n\n")
+                f.write("## Role Description\n")
+                f.write("[Role summary]\n\n")
+                f.write("## Responsibilities\n")
+                f.write("- [Responsibility 1]\n")
+                f.write("- [Responsibility 2]\n\n")
+                f.write("## Requirements\n")
+                f.write("- [Requirement 1]\n")
+                f.write("- [Requirement 2]\n\n")
+                f.write("## Nice to Have\n")
+                f.write("- [Nice to have 1]\n")
+                f.write("- [Nice to have 2]\n\n")
+                f.write("## Benefits\n")
+                f.write("[Benefits information]\n")
+            
+            results["created"].append({
+                "id": application.id,
+                "company": company_name,
+                "role": role,
+                "url": url,
+                "directory": str(app_dir.relative_to(APPLICATIONS_DIR))
+            })
+            
+        except Exception as e:
+            results["failed"].append({
+                "url": url,
+                "error": str(e)
+            })
+    
+    return {
+        "summary": {
+            "created": len(results["created"]),
+            "skipped": len(results["skipped"]),
+            "failed": len(results["failed"])
+        },
+        "details": results
+    }

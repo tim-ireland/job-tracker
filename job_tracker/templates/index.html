@@ -668,20 +668,48 @@
 
     <!-- Bulk Import Modal -->
     <div id="bulkImportModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 800px;">
             <div class="modal-header">
                 <h2><i class="fas fa-file-import"></i> Bulk Import URLs</h2>
                 <button class="close-modal">&times;</button>
             </div>
             <div style="padding: 20px;">
-                <p style="margin-bottom: 20px; color: var(--text-secondary);">
-                    <i class="fas fa-info-circle"></i> Coming soon! This feature will import job postings from a list of URLs.
+                <p style="margin-bottom: 15px; color: var(--text-secondary);">
+                    <i class="fas fa-info-circle"></i> Paste job posting URLs (one per line). LinkedIn URLs will be skipped automatically.
                 </p>
-                <div class="flex flex-end">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('bulkImportModal')">
-                        <i class="fas fa-times"></i> Close
-                    </button>
+                <div class="alert alert-warning" style="margin-bottom: 20px; padding: 12px; background: rgba(255, 193, 7, 0.1); border-left: 3px solid #ffc107; border-radius: 4px;">
+                    <i class="fas fa-exclamation-triangle"></i> <strong>Note:</strong> LinkedIn job posting URLs are not supported. Please use the company's direct application page URL instead.
                 </div>
+                <form id="bulkImportForm">
+                    <div class="form-group">
+                        <label for="bulkImportUrls">Job URLs (one per line)</label>
+                        <textarea 
+                            id="bulkImportUrls" 
+                            rows="10" 
+                            style="width: 100%; font-family: monospace; font-size: 13px;"
+                            placeholder="https://company.com/careers/job1&#10;https://company2.com/jobs/position&#10;https://company3.com/apply/role"
+                            required
+                        ></textarea>
+                    </div>
+                    <div id="bulkImportProgress" style="display: none; margin-top: 15px;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <span>Importing applications...</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="bulkImportProgressBar"></div>
+                        </div>
+                    </div>
+                    <div id="bulkImportResults" style="display: none; margin-top: 15px;"></div>
+                    <div class="flex flex-end" style="margin-top: 20px; gap: 10px;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('bulkImportModal')">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-file-import"></i> Import
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

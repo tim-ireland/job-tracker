@@ -1081,3 +1081,108 @@ function showMatchDetails(appId) {
     
     alert(message);
 }
+
+// Bulk import form handler
+document.getElementById('bulkImportForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const textarea = document.getElementById('bulkImportUrls');
+    const progress = document.getElementById('bulkImportProgress');
+    const results = document.getElementById('bulkImportResults');
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    
+    // Parse URLs from textarea
+    const urls = textarea.value
+        .split('\n')
+        .map(url => url.trim())
+        .filter(url => url.length > 0);
+    
+    if (urls.length === 0) {
+        alert('Please enter at least one URL');
+        return;
+    }
+    
+    // Show progress
+    progress.style.display = 'block';
+    results.style.display = 'none';
+    submitBtn.disabled = true;
+    
+    try {
+        const response = await fetch(`${API_BASE}/applications/bulk-import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ urls })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to import applications');
+        }
+        
+        const data = await response.json();
+        
+        // Hide progress, show results
+        progress.style.display = 'none';
+        results.style.display = 'block';
+        
+        // Build results HTML
+        let html = '<div style="max-height: 300px; overflow-y: auto;">';
+        
+        // Summary
+        html += `<div style="margin-bottom: 15px; padding: 12px; background: var(--card-bg); border-radius: 6px;">`;
+        html += `<strong>Import Summary:</strong><br>`;
+        html += `<span style="color: var(--success-color);">✓ Created: ${data.summary.created}</span><br>`;
+        html += `<span style="color: var(--warning-color);">⊘ Skipped: ${data.summary.skipped}</span><br>`;
+        html += `<span style="color: var(--danger-color);">✗ Failed: ${data.summary.failed}</span>`;
+        html += `</div>`;
+        
+        // Created applications
+        if (data.details.created && data.details.created.length > 0) {
+            html += `<div style="margin-bottom: 15px;"><strong style="color: var(--success-color);">Created Applications:</strong><ul style="margin-top: 8px;">`;
+            data.details.created.forEach(item => {
+                html += `<li>${item.company} - ${item.role}</li>`;
+            });
+            html += `</ul></div>`;
+        }
+        
+        // Skipped URLs
+        if (data.details.skipped && data.details.skipped.length > 0) {
+            html += `<div style="margin-bottom: 15px;"><strong style="color: var(--warning-color);">Skipped URLs:</strong><ul style="margin-top: 8px;">`;
+            data.details.skipped.forEach(item => {
+                html += `<li><small>${item.url}</small><br><em style="color: var(--text-secondary); font-size: 0.9em;">${item.reason}</em></li>`;
+            });
+            html += `</ul></div>`;
+        }
+        
+        // Failed URLs
+        if (data.details.failed && data.details.failed.length > 0) {
+            html += `<div style="margin-bottom: 15px;"><strong style="color: var(--danger-color);">Failed URLs:</strong><ul style="margin-top: 8px;">`;
+            data.details.failed.forEach(item => {
+                html += `<li><small>${item.url}</small><br><em style="color: var(--text-secondary); font-size: 0.9em;">${item.error}</em></li>`;
+            });
+            html += `</ul></div>`;
+        }
+        
+        html += '</div>';
+        
+        results.innerHTML = html;
+        
+        // Clear form
+        textarea.value = '';
+        
+        // Reload applications if any were created
+        if (data.summary.created > 0) {
+            setTimeout(() => {
+                loadApplications();
+            }, 2000);
+        }
+        
+    } catch (error) {
+        console.error('Error importing URLs:', error);
+        progress.style.display = 'none';
+        results.style.display = 'block';
+        results.innerHTML = `<div class="alert alert-danger"><i class="fas fa-times-circle"></i> Error: ${error.message}</div>`;
+    } finally {
+        submitBtn.disabled = false;
+    }
+});
