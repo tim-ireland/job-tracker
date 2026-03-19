@@ -83,6 +83,12 @@ class Application(ApplicationBase):
     date_interview: Optional[datetime] = None
     date_offer: Optional[datetime] = None
     date_closed: Optional[datetime] = None
+    match_score: Optional[int] = None
+    match_reasoning: Optional[str] = None
+    match_strengths: Optional[str] = None
+    match_gaps: Optional[str] = None
+    match_recommendation: Optional[str] = None
+    evaluated_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

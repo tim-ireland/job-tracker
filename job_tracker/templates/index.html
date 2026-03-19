@@ -23,8 +23,12 @@
     <div class="container">
         <div class="dashboard-stats">
             <div class="stat-card">
-                <h3><i class="fas fa-folder-open"></i> Total Applications</h3>
+                <h3><i class="fas fa-folder-open"></i> Total</h3>
                 <div class="value" id="totalApps">0</div>
+            </div>
+            <div class="stat-card clickable" id="pipelineCard">
+                <h3><i class="fas fa-tasks"></i> Pipeline</h3>
+                <div class="value" id="pipelineApps">0</div>
             </div>
             <div class="stat-card">
                 <h3><i class="fas fa-paper-plane"></i> Applied</h3>
@@ -78,13 +82,22 @@
                             <input type="checkbox" id="showClosedApps" style="cursor: pointer;">
                             <span>Show Closed</span>
                         </label>
-                        <!-- LinkedIn import temporarily disabled due to rate limiting -->
-                        <!-- <button class="btn btn-secondary" id="importJobsBtn">
-                            <i class="fas fa-file-import"></i> Import from LinkedIn
-                        </button> -->
-                        <button class="btn btn-primary" id="addApplicationBtn">
-                            <i class="fas fa-plus"></i> Add Application
-                        </button>
+                        <div style="position: relative;">
+                            <button class="btn btn-secondary" id="actionsDropdownBtn">
+                                <i class="fas fa-bolt"></i> Actions <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <div class="dropdown-menu" id="actionsDropdownMenu" style="display: none;">
+                                <button class="dropdown-item" id="addApplicationBtn">
+                                    <i class="fas fa-plus"></i> Add Application
+                                </button>
+                                <button class="dropdown-item" id="scorePipelineBtn">
+                                    <i class="fas fa-chart-line"></i> Score Pipeline Jobs
+                                </button>
+                                <button class="dropdown-item" id="bulkImportBtn">
+                                    <i class="fas fa-file-import"></i> Bulk Import URLs
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <table>
@@ -96,6 +109,10 @@
                             </th>
                             <th class="sortable" data-sort="role" style="cursor: pointer;">
                                 <i class="fas fa-user-tie"></i> Role
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="match_score" style="cursor: pointer;">
+                                <i class="fas fa-bullseye"></i> Match
                                 <i class="fas fa-sort sort-icon"></i>
                             </th>
                             <th class="sortable" data-sort="priority" style="cursor: pointer;">
@@ -118,7 +135,7 @@
                         </tr>
                     </thead>
                     <tbody id="applicationTableBody">
-                        <tr><td colspan="7">Loading...</td></tr>
+                        <tr><td colspan="8">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -589,6 +606,119 @@
                         <i class="fas fa-download"></i> Download
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Scoring Modal -->
+    <div id="bulkScoringModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2><i class="fas fa-chart-line"></i> Score Pipeline Jobs</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div style="padding: 20px;">
+                <p style="margin-bottom: 20px; color: var(--text-secondary);">
+                    Generate a scoring prompt for all Pipeline jobs, send to AI (Claude/ChatGPT), then paste the response back here to update scores.
+                </p>
+                
+                <div id="scoringStep1" style="display: block;">
+                    <h3 style="margin-bottom: 15px;"><i class="fas fa-1"></i> Step 1: Generate Prompt</h3>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="rescoreCheckbox" style="width: auto;">
+                            <span>Re-score already evaluated applications</span>
+                        </label>
+                        <p style="color: var(--text-secondary); font-size: 0.85em; margin-top: 5px; margin-left: 24px;">
+                            By default, only applications without scores are included. Check this to re-evaluate all Pipeline jobs.
+                        </p>
+                    </div>
+                    <button class="btn btn-primary" id="generatePromptBtn">
+                        <i class="fas fa-magic"></i> Generate Scoring Prompt
+                    </button>
+                    <div id="promptStatus" style="margin-top: 10px; display: none;"></div>
+                </div>
+
+                <div id="scoringStep2" style="display: none; margin-top: 30px;">
+                    <h3 style="margin-bottom: 15px;"><i class="fas fa-2"></i> Step 2: Copy Prompt</h3>
+                    <div style="background: var(--bg-primary); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <span><strong>Applications to score:</strong> <span id="promptAppCount">0</span></span>
+                            <button class="btn btn-secondary btn-sm" id="copyPromptBtn">
+                                <i class="fas fa-copy"></i> Copy to Clipboard
+                            </button>
+                        </div>
+                        <textarea id="scoringPrompt" readonly style="width: 100%; height: 300px; font-family: monospace; font-size: 0.85em; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; resize: vertical;"></textarea>
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 0.9em;">
+                        <i class="fas fa-info-circle"></i> Copy this prompt and paste it into Claude, ChatGPT, or your local LLM.
+                    </p>
+                </div>
+
+                <div id="scoringStep3" style="display: none; margin-top: 30px;">
+                    <h3 style="margin-bottom: 15px;"><i class="fas fa-3"></i> Step 3: Paste AI Response</h3>
+                    <textarea id="aiResponse" placeholder="Paste the JSON response from AI here..." style="width: 100%; height: 200px; font-family: monospace; font-size: 0.85em; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; resize: vertical;"></textarea>
+                    <div style="margin-top: 15px;">
+                        <button class="btn btn-primary" id="parseScoresBtn">
+                            <i class="fas fa-database"></i> Parse & Update Scores
+                        </button>
+                    </div>
+                    <div id="parseStatus" style="margin-top: 10px; display: none;"></div>
+                </div>
+
+                <div class="flex flex-end" style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('bulkScoringModal')">
+                        <i class="fas fa-times"></i> Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Import Modal -->
+    <div id="bulkImportModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-file-import"></i> Bulk Import URLs</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div style="padding: 20px;">
+                <p style="margin-bottom: 15px; color: var(--text-secondary);">
+                    <i class="fas fa-info-circle"></i> Paste job posting URLs (one per line). LinkedIn URLs will be skipped automatically.
+                </p>
+                <div class="alert alert-warning" style="margin-bottom: 20px; padding: 12px; background: rgba(255, 193, 7, 0.1); border-left: 3px solid #ffc107; border-radius: 4px;">
+                    <i class="fas fa-exclamation-triangle"></i> <strong>Note:</strong> LinkedIn job posting URLs are not supported. Please use the company's direct application page URL instead.
+                </div>
+                <form id="bulkImportForm">
+                    <div class="form-group">
+                        <label for="bulkImportUrls">Job URLs (one per line)</label>
+                        <textarea 
+                            id="bulkImportUrls" 
+                            rows="10" 
+                            style="width: 100%; font-family: monospace; font-size: 13px;"
+                            placeholder="https://company.com/careers/job1&#10;https://company2.com/jobs/position&#10;https://company3.com/apply/role"
+                            required
+                        ></textarea>
+                    </div>
+                    <div id="bulkImportProgress" style="display: none; margin-top: 15px;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <span>Importing applications...</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="bulkImportProgressBar"></div>
+                        </div>
+                    </div>
+                    <div id="bulkImportResults" style="display: none; margin-top: 15px;"></div>
+                    <div class="flex flex-end" style="margin-top: 20px; gap: 10px;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('bulkImportModal')">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-file-import"></i> Import
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

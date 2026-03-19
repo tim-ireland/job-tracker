@@ -107,10 +107,20 @@ function sortApplications() {
                 aVal = a.role.toLowerCase();
                 bVal = b.role.toLowerCase();
                 break;
+            case 'match_score':
+                aVal = a.match_score || 0;
+                bVal = b.match_score || 0;
+                break;
             case 'priority':
-                // P1 < P2 < P3 < P4
-                aVal = parseInt(a.priority.replace('P', ''));
-                bVal = parseInt(b.priority.replace('P', ''));
+                // P1 < P2 < P3 < P4 < P5
+                // Handle both "P1" format and other text (e.g., "Medium")
+                const parsePriority = (p) => {
+                    if (!p) return 999;
+                    const match = p.match(/P(\d+)/);
+                    return match ? parseInt(match[1]) : 999;
+                };
+                aVal = parsePriority(a.priority);
+                bVal = parsePriority(b.priority);
                 break;
             case 'status':
                 aVal = a.status.toLowerCase();
@@ -148,6 +158,7 @@ async function loadDashboard() {
         const response = await fetch(`${API_BASE}/dashboard`);
         const data = await response.json();
         document.getElementById('totalApps').textContent = data.total_applications;
+        document.getElementById('pipelineApps').textContent = data.by_status.Pipeline || 0;
         const appliedCount = (data.by_status.Applied || 0) + (data.by_status.Screening || 0);
         document.getElementById('appliedApps').textContent = appliedCount;
         document.getElementById('screeningApps').textContent = data.by_status.Screening || 0;
@@ -173,11 +184,42 @@ function setupDashboardFilters() {
         let filterStatus = null;
         switch(index) {
             case 0: filterStatus = null; break;  // Total - no filter
-            case 1: filterStatus = 'Applied+Screening'; break;  // Applied (includes Screening)
-            case 2: filterStatus = 'Screening'; break;
-            case 3: filterStatus = 'Interview'; break;
-            case 4: filterStatus = 'Offer'; break;
-            case 5: filterStatus = 'Rejected'; break;
+            case 1: filterStatus = 'Pipeline'; break;  // Pipeline
+            case 2: filterStatus = 'Applied+Screening'; break;  // Applied (includes Screening)
+            case 3: filterStatus = 'Screening'; break;
+            case 4: filterStatus = 'Interview'; break;
+            case 5: filterStatus = 'Offer'; break;
+            case 6: filterStatus = 'Rejected'; break;
+        }
+        
+        card.onclick = () => {
+            // Toggle filter
+            if (statusFilter === filterStatus) {
+                statusFilter = null;  // Clear filter
+                statCards.forEach(c => c.classList.remove('active-filter'));
+            } else {
+                statusFilter = filterStatus;
+                statCards.forEach(c => c.classList.remove('active-filter'));
+                card.classList.add('active-filter');
+                
+                // Auto-enable show closed if filtering for rejected
+                if (filterStatus === 'Rejected') {
+                    showClosedApps = true;
+                    document.getElementById('showClosedApps').checked = true;
+                }
+            }
+            
+            updateApplicationList();
+        };
+        
+        // Hover effect
+        card.onmouseenter = () => {
+            if (statusFilter !== filterStatus) {
+                card.style.transform = 'translateY(-2px)';
+            }
+        };
+        card.onmouseleave = () => {
+            card.style.transform = 'translateY(0)';
         }
         
         card.onclick = () => {
@@ -282,7 +324,7 @@ function updateApplicationList() {
     }
     
     if (filteredApps.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7">No applications to display</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8">No applications to display</td></tr>';
         return;
     }
     
@@ -296,6 +338,7 @@ function updateApplicationList() {
             <tr onclick="viewApplication(${app.id})" style="cursor: pointer;">
                 <td><strong>${escapeHtml(companyName)}</strong></td>
                 <td>${roleDisplay}</td>
+                <td onclick="event.stopPropagation()">${renderMatchScore(app)}</td>
                 <td><span class="badge badge-${app.priority.toLowerCase()}">${app.priority}</span></td>
                 <td><span class="badge badge-${app.status.toLowerCase()}">${app.status}</span></td>
                 <td>${app.salary_range ? escapeHtml(app.salary_range) : '-'}</td>
@@ -849,3 +892,336 @@ async function handleFileUpload(applicationId, files) {
         }, 3000);
     }
 }
+
+// ==================== BULK JOB SCORING ====================
+
+// Actions dropdown toggle
+document.getElementById('actionsDropdownBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('actionsDropdownMenu');
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', () => {
+    const menu = document.getElementById('actionsDropdownMenu');
+    if (menu) menu.style.display = 'none';
+});
+
+// Score Pipeline Jobs button
+document.getElementById('scorePipelineBtn')?.addEventListener('click', () => {
+    document.getElementById('actionsDropdownMenu').style.display = 'none';
+    openModal('bulkScoringModal');
+    resetScoringModal();
+});
+
+// Bulk Import button
+document.getElementById('bulkImportBtn')?.addEventListener('click', () => {
+    document.getElementById('actionsDropdownMenu').style.display = 'none';
+    
+    // Reset modal state
+    const form = document.getElementById('bulkImportForm');
+    const cancelBtn = form.querySelector('button.btn-secondary');
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const progress = document.getElementById('bulkImportProgress');
+    const results = document.getElementById('bulkImportResults');
+    
+    cancelBtn.innerHTML = '<i class="fas fa-times"></i> Cancel';
+    submitBtn.style.display = '';
+    submitBtn.disabled = false;
+    progress.style.display = 'none';
+    results.style.display = 'none';
+    
+    openModal('bulkImportModal');
+});
+
+function resetScoringModal() {
+    document.getElementById('scoringStep1').style.display = 'block';
+    document.getElementById('scoringStep2').style.display = 'none';
+    document.getElementById('scoringStep3').style.display = 'none';
+    document.getElementById('promptStatus').style.display = 'none';
+    document.getElementById('parseStatus').style.display = 'none';
+    document.getElementById('scoringPrompt').value = '';
+    document.getElementById('aiResponse').value = '';
+}
+
+// Generate Prompt button
+document.getElementById('generatePromptBtn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('generatePromptBtn');
+    const status = document.getElementById('promptStatus');
+    const rescore = document.getElementById('rescoreCheckbox').checked;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+    status.style.display = 'block';
+    status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Fetching Pipeline applications...';
+    
+    try {
+        const response = await fetch(`${API_BASE}/applications/bulk-score`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                status_filter: 'Pipeline', 
+                use_api: false,
+                rescore: rescore
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to generate prompt');
+        }
+        
+        const data = await response.json();
+        
+        document.getElementById('scoringPrompt').value = data.prompt;
+        document.getElementById('promptAppCount').textContent = data.application_count;
+        
+        // Show step 2 and 3
+        document.getElementById('scoringStep2').style.display = 'block';
+        document.getElementById('scoringStep3').style.display = 'block';
+        
+        status.innerHTML = `<i class="fas fa-check-circle" style="color: var(--success-color);"></i> Generated prompt for ${data.application_count} applications`;
+        
+    } catch (error) {
+        console.error('Error generating prompt:', error);
+        status.innerHTML = `<i class="fas fa-times-circle" style="color: var(--danger-color);"></i> Error: ${error.message}`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-magic"></i> Generate Scoring Prompt';
+    }
+});
+
+// Copy Prompt button
+document.getElementById('copyPromptBtn')?.addEventListener('click', async () => {
+    const prompt = document.getElementById('scoringPrompt').value;
+    const btn = document.getElementById('copyPromptBtn');
+    
+    try {
+        await navigator.clipboard.writeText(prompt);
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+        }, 2000);
+    } catch (error) {
+        console.error('Failed to copy:', error);
+        alert('Failed to copy to clipboard');
+    }
+});
+
+// Parse Scores button
+document.getElementById('parseScoresBtn')?.addEventListener('click', async () => {
+    const aiResponse = document.getElementById('aiResponse').value.trim();
+    const btn = document.getElementById('parseScoresBtn');
+    const status = document.getElementById('parseStatus');
+    
+    if (!aiResponse) {
+        status.style.display = 'block';
+        status.innerHTML = '<i class="fas fa-exclamation-triangle" style="color: var(--warning-color);"></i> Please paste the AI response';
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Parsing...';
+    status.style.display = 'block';
+    status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating database...';
+    
+    try {
+        const response = await fetch(`${API_BASE}/applications/parse-scores`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ai_response: aiResponse })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to parse scores');
+        }
+        
+        const data = await response.json();
+        
+        status.innerHTML = `<i class="fas fa-check-circle" style="color: var(--success-color);"></i> Updated ${data.updated} applications` +
+            (data.failed > 0 ? ` <span style="color: var(--warning-color);">(${data.failed} failed)</span>` : '');
+        
+        // Reload applications table
+        setTimeout(() => {
+            loadApplications();
+            closeModal('bulkScoringModal');
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Error parsing scores:', error);
+        status.innerHTML = `<i class="fas fa-times-circle" style="color: var(--danger-color);"></i> Error: ${error.message}`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-database"></i> Parse & Update Scores';
+    }
+});
+
+// Render match score badge
+function renderMatchScore(app) {
+    if (!app.match_score) {
+        return '<span class="match-score-none">—</span>';
+    }
+    
+    const score = app.match_score;
+    let badgeClass = 'match-score-poor';
+    
+    if (score >= 80) badgeClass = 'match-score-excellent';
+    else if (score >= 70) badgeClass = 'match-score-strong';
+    else if (score >= 60) badgeClass = 'match-score-good';
+    else if (score >= 50) badgeClass = 'match-score-moderate';
+    
+    const tooltip = app.match_reasoning ? `data-tooltip="${escapeHtml(app.match_reasoning)}"` : '';
+    
+    return `<span class="match-score-badge ${badgeClass}" ${tooltip} onclick="showMatchDetails(${app.id})">${score}</span>`;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML.replace(/"/g, '&quot;');
+}
+
+function showMatchDetails(appId) {
+    // Find the application
+    const app = applications.find(a => a.id === appId);
+    if (!app || !app.match_score) return;
+    
+    // Show details in a simple alert for now (could be a modal later)
+    let message = `Match Score: ${app.match_score}\n`;
+    message += `Recommendation: ${app.match_recommendation || 'N/A'}\n\n`;
+    message += `Reasoning:\n${app.match_reasoning || 'N/A'}\n\n`;
+    
+    if (app.match_strengths) {
+        try {
+            const strengths = JSON.parse(app.match_strengths);
+            message += `Strengths:\n${strengths.map(s => `• ${s}`).join('\n')}\n\n`;
+        } catch (e) {}
+    }
+    
+    if (app.match_gaps) {
+        try {
+            const gaps = JSON.parse(app.match_gaps);
+            message += `Gaps:\n${gaps.map(g => `• ${g}`).join('\n')}`;
+        } catch (e) {}
+    }
+    
+    alert(message);
+}
+
+// Bulk import form handler
+document.getElementById('bulkImportForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const textarea = document.getElementById('bulkImportUrls');
+    const progress = document.getElementById('bulkImportProgress');
+    const results = document.getElementById('bulkImportResults');
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    
+    // Parse URLs from textarea
+    const urls = textarea.value
+        .split('\n')
+        .map(url => url.trim())
+        .filter(url => url.length > 0);
+    
+    if (urls.length === 0) {
+        alert('Please enter at least one URL');
+        return;
+    }
+    
+    // Show progress
+    progress.style.display = 'block';
+    results.style.display = 'none';
+    submitBtn.disabled = true;
+    
+    try {
+        const response = await fetch(`${API_BASE}/applications/bulk-import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ urls })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to import applications');
+        }
+        
+        const data = await response.json();
+        
+        // Hide progress, show results
+        progress.style.display = 'none';
+        results.style.display = 'block';
+        
+        // Build results HTML
+        let html = '<div style="max-height: 300px; overflow-y: auto;">';
+        
+        // Summary
+        html += `<div style="margin-bottom: 15px; padding: 12px; background: var(--card-bg); border-radius: 6px;">`;
+        html += `<strong>Import Summary:</strong><br>`;
+        html += `<span style="color: var(--success-color);">✓ Created: ${data.summary.created}</span><br>`;
+        html += `<span style="color: var(--warning-color);">⊘ Skipped: ${data.summary.skipped}</span><br>`;
+        html += `<span style="color: var(--danger-color);">✗ Failed: ${data.summary.failed}</span>`;
+        html += `</div>`;
+        
+        // Created applications
+        if (data.details.created && data.details.created.length > 0) {
+            html += `<div style="margin-bottom: 15px;"><strong style="color: var(--success-color);">Created Applications:</strong><ul style="margin-top: 8px;">`;
+            data.details.created.forEach(item => {
+                html += `<li>${item.company} - ${item.role}</li>`;
+            });
+            html += `</ul></div>`;
+        }
+        
+        // Skipped URLs
+        if (data.details.skipped && data.details.skipped.length > 0) {
+            html += `<div style="margin-bottom: 15px;"><strong style="color: var(--warning-color);">Skipped URLs:</strong><ul style="margin-top: 8px;">`;
+            data.details.skipped.forEach(item => {
+                html += `<li><small>${item.url}</small><br><em style="color: var(--text-secondary); font-size: 0.9em;">${item.reason}</em></li>`;
+            });
+            html += `</ul></div>`;
+        }
+        
+        // Failed URLs
+        if (data.details.failed && data.details.failed.length > 0) {
+            html += `<div style="margin-bottom: 15px;"><strong style="color: var(--danger-color);">Failed URLs:</strong><ul style="margin-top: 8px;">`;
+            data.details.failed.forEach(item => {
+                html += `<li><small>${item.url}</small><br><em style="color: var(--text-secondary); font-size: 0.9em;">${item.error}</em></li>`;
+            });
+            html += `</ul></div>`;
+        }
+        
+        html += '</div>';
+        
+        results.innerHTML = html;
+        
+        // Clear form
+        textarea.value = '';
+        
+        // Change buttons after completion
+        const cancelBtn = e.target.querySelector('button.btn-secondary');
+        cancelBtn.innerHTML = '<i class="fas fa-check"></i> Close';
+        submitBtn.style.display = 'none';
+        
+        // Reload applications if any were created
+        if (data.summary.created > 0) {
+            setTimeout(() => {
+                loadApplications();
+            }, 2000);
+        }
+        
+    } catch (error) {
+        console.error('Error importing URLs:', error);
+        progress.style.display = 'none';
+        results.style.display = 'block';
+        results.innerHTML = `<div class="alert alert-danger"><i class="fas fa-times-circle"></i> Error: ${error.message}</div>`;
+        
+        // Change buttons on error too
+        const cancelBtn = e.target.querySelector('button.btn-secondary');
+        cancelBtn.innerHTML = '<i class="fas fa-times"></i> Close';
+        submitBtn.style.display = 'none';
+    } finally {
+        submitBtn.disabled = false;
+    }
+});

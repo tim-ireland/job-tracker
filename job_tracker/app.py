@@ -693,3 +693,375 @@ def get_dua_range_report_csv(start_date: str, end_date: str, db: Session = Depen
             "Content-Disposition": f"attachment; filename=dua_range_{start.strftime('%Y%m%d')}_{end.strftime('%Y%m%d')}.csv"
         }
     )
+
+
+# ==================== BULK JOB SCORING ENDPOINTS ====================
+
+from .scoring import JobScorer
+
+class BulkScoreRequest(BaseModel):
+    status_filter: Optional[str] = "Pipeline"
+    use_api: bool = False
+    rescore: bool = False  # If True, re-score already scored applications
+
+class ParseScoresRequest(BaseModel):
+    ai_response: str
+
+
+@app.post("/api/applications/bulk-score")
+def bulk_score_applications(request: BulkScoreRequest, db: Session = Depends(get_db)):
+    """
+    Generate bulk scoring prompt for Pipeline applications.
+    
+    By default, skips applications that already have match_score.
+    Set rescore=True to re-evaluate already-scored applications.
+    
+    Returns prompt to copy-paste into AI, or (future) calls AI API directly.
+    """
+    
+    # Get applications with specified status
+    applications = crud.get_applications(db, status=request.status_filter, limit=1000)
+    
+    if not applications:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"No applications found with status '{request.status_filter}'"
+        )
+    
+    # Filter out already-scored applications unless rescore is True
+    if not request.rescore:
+        applications = [app for app in applications if app.match_score is None]
+        
+        if not applications:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No unscored applications found with status '{request.status_filter}'. Set rescore=true to re-evaluate."
+            )
+    
+    # Load job descriptions and build application data
+    app_data = []
+    for app in applications:
+        # Get application directory
+        company_name = app.company.name.replace(' ', '_')
+        role = app.role.replace(' ', '_').replace('/', '_')
+        app_dir = APPLICATIONS_DIR / f"{company_name}_{role}"
+        job_desc_path = app_dir / "job_description.txt"
+        
+        # Load job description if exists
+        job_description = ""
+        if job_desc_path.exists():
+            with open(job_desc_path, 'r') as f:
+                job_description = f.read()
+        
+        app_data.append({
+            'id': app.id,
+            'company': app.company.name,
+            'role': app.role,
+            'location': app.location or 'Not specified',
+            'job_url': app.job_url or 'Not provided',
+            'job_description': job_description or 'No job description found'
+        })
+    
+    # Generate prompt
+    scorer = JobScorer(data_dir=DATA_DIR)
+    prompt = scorer.generate_bulk_prompt(app_data)
+    
+    if request.use_api:
+        # Future: Call AI API here
+        return {
+            "message": "API integration not yet implemented",
+            "prompt": prompt,
+            "application_count": len(app_data)
+        }
+    
+    # Return prompt for manual copy-paste
+    return {
+        "prompt": prompt,
+        "application_count": len(app_data),
+        "applications": [{'id': a['id'], 'company': a['company'], 'role': a['role']} for a in app_data]
+    }
+
+
+@app.post("/api/applications/parse-scores")
+def parse_scoring_response(request: ParseScoresRequest, db: Session = Depends(get_db)):
+    """
+    Parse AI scoring response and update database with scores.
+    
+    Expects JSON response from AI with evaluations array.
+    """
+    
+    try:
+        scorer = JobScorer(data_dir=DATA_DIR)
+        results = scorer.parse_scores(request.ai_response)
+        
+        if not results:
+            raise HTTPException(status_code=400, detail="No evaluations found in response")
+        
+        # Update database
+        updated = 0
+        failed = 0
+        errors = []
+        
+        for result in results:
+            try:
+                app_id = result['application_id']
+                
+                # Get application
+                application = crud.get_application(db, app_id)
+                if not application:
+                    errors.append(f"Application {app_id} not found")
+                    failed += 1
+                    continue
+                
+                # Update with scores
+                application.match_score = result['match_score']
+                application.match_reasoning = result['match_reasoning']
+                application.match_strengths = result['match_strengths']
+                application.match_gaps = result['match_gaps']
+                application.match_recommendation = result['match_recommendation']
+                application.evaluated_at = datetime.fromisoformat(result['evaluated_at'])
+                
+                db.commit()
+                updated += 1
+                
+            except Exception as e:
+                errors.append(f"Application {result.get('application_id', 'unknown')}: {str(e)}")
+                failed += 1
+                db.rollback()
+        
+        return {
+            "updated": updated,
+            "failed": failed,
+            "errors": errors if errors else None
+        }
+    
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse scores: {str(e)}")
+
+
+@app.post("/api/applications/{application_id}/score")
+def score_single_application(application_id: int, db: Session = Depends(get_db)):
+    """
+    Generate scoring prompt for a single application.
+    
+    Useful for re-scoring individual jobs or scoring new applications.
+    """
+    
+    application = crud.get_application(db, application_id)
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    # Get job description
+    company_name = application.company.name.replace(' ', '_')
+    role = application.role.replace(' ', '_').replace('/', '_')
+    app_dir = APPLICATIONS_DIR / f"{company_name}_{role}"
+    job_desc_path = app_dir / "job_description.txt"
+    
+    job_description = ""
+    if job_desc_path.exists():
+        with open(job_desc_path, 'r') as f:
+            job_description = f.read()
+    
+    app_data = [{
+        'id': application.id,
+        'company': application.company.name,
+        'role': application.role,
+        'location': application.location or 'Not specified',
+        'job_url': application.job_url or 'Not provided',
+        'job_description': job_description or 'No job description found'
+    }]
+    
+    # Generate prompt for single application
+    scorer = JobScorer(data_dir=DATA_DIR)
+    prompt = scorer.generate_bulk_prompt(app_data)
+    
+    return {
+        "prompt": prompt,
+        "application": {
+            "id": application.id,
+            "company": application.company.name,
+            "role": application.role
+        }
+    }
+
+
+@app.post("/api/applications/bulk-import")
+def bulk_import_applications(urls: List[str] = Body(..., embed=True), db: Session = Depends(get_db)):
+    """
+    Bulk import applications from a list of URLs.
+    
+    Validates URLs and skips LinkedIn job posting URLs.
+    Creates application entries and directories for valid URLs.
+    """
+    import re
+    import urllib.request
+    from bs4 import BeautifulSoup
+    
+    results = {
+        "created": [],
+        "skipped": [],
+        "failed": []
+    }
+    
+    # LinkedIn URL patterns to skip
+    linkedin_patterns = [
+        r'linkedin\.com/jobs/',
+        r'linkedin\.com/job/',
+        r'linkedin\.com/.*jobs/view/'
+    ]
+    
+    for url in urls:
+        url = url.strip()
+        if not url:
+            continue
+            
+        # Check if it's a LinkedIn URL
+        is_linkedin = any(re.search(pattern, url, re.IGNORECASE) for pattern in linkedin_patterns)
+        if is_linkedin:
+            results["skipped"].append({
+                "url": url,
+                "reason": "LinkedIn job posting URLs are not supported. Please use the company's direct application page."
+            })
+            continue
+        
+        try:
+            # Try to fetch the page and extract company name and role
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            req = urllib.request.Request(url, headers=headers)
+            
+            with urllib.request.urlopen(req, timeout=10) as response:
+                html = response.read()
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                # Try to extract title (role)
+                title = soup.find('title')
+                role = title.get_text().strip() if title else "Unknown Role"
+                
+                # Clean up common title patterns
+                role = re.sub(r'\s*[-|]\s*.*$', '', role)  # Remove "- Company Name" suffix
+                role = role[:100]  # Limit length
+                
+                # Try to extract company from URL domain
+                from urllib.parse import urlparse
+                domain = urlparse(url).netloc
+                company_name = domain.replace('www.', '').split('.')[0].title()
+                
+            # Check if company exists, create if not
+            company = crud.get_company_by_name(db, company_name)
+            if not company:
+                company = crud.create_company(db, models.CompanyCreate(name=company_name))
+            
+            # Create application
+            application = crud.create_application(db, models.ApplicationCreate(
+                company_id=company.id,
+                role=role,
+                job_url=url,
+                status="Pipeline",
+                priority="P3",
+                salary_range=salary_range
+            ))
+            
+            # Create application directory
+            company_name_clean = company_name.replace(' ', '_')
+            role_clean = role.replace(' ', '_').replace('/', '_')
+            app_dir = APPLICATIONS_DIR / f"{company_name_clean}_{role_clean}"
+            app_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Extract main content from the page
+            # Try to find the main job description content
+            job_content = ""
+            
+            # Try common job description containers
+            for selector in ['article', 'main', '.job-description', '#job-description', 
+                           '.description', '[class*="description"]', '[class*="job"]']:
+                content_elem = soup.select_one(selector)
+                if content_elem:
+                    # Get text and clean it up
+                    text = content_elem.get_text(separator='\n', strip=True)
+                    if len(text) > 200:  # Only use if substantial content
+                        job_content = text
+                        break
+            
+            # Fallback: get all text from body if no specific container found
+            if not job_content:
+                body = soup.find('body')
+                if body:
+                    job_content = body.get_text(separator='\n', strip=True)
+            
+            # Try to extract salary range from content
+            salary_range = None
+            if job_content:
+                # Common salary patterns
+                salary_patterns = [
+                    r'\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*[-–—to]\s*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',  # $100,000 - $150,000
+                    r'(\d{1,3})k?\s*[-–—to]\s*(\d{1,3})k',  # 100k - 150k
+                    r'salary.*?\$\s*(\d{1,3}(?:,\d{3})*)',  # salary: $120,000
+                ]
+                
+                for pattern in salary_patterns:
+                    match = re.search(pattern, job_content, re.IGNORECASE)
+                    if match:
+                        try:
+                            if len(match.groups()) == 2:
+                                min_sal = match.group(1).replace(',', '')
+                                max_sal = match.group(2).replace(',', '')
+                                # Handle 'k' notation (e.g., 100k)
+                                if 'k' in pattern.lower():
+                                    min_sal = str(int(min_sal) * 1000)
+                                    max_sal = str(int(max_sal) * 1000)
+                                salary_range = f"${min_sal} - ${max_sal}"
+                            else:
+                                salary_range = f"${match.group(1)}"
+                            break
+                        except (ValueError, IndexError):
+                            continue
+            
+            # Save job description with URL and scraped content
+            job_desc_path = app_dir / "job_description.txt"
+            with open(job_desc_path, 'w', encoding='utf-8') as f:
+                f.write(f"Job URL: {url}\n\n")
+                if job_content:
+                    f.write(job_content)
+                else:
+                    f.write("# Paste the job description here\n\n")
+                    f.write("## Company Information\n")
+                    f.write("[Company background, mission, values]\n\n")
+                    f.write("## Role Description\n")
+                    f.write("[Role summary]\n\n")
+                    f.write("## Responsibilities\n")
+                    f.write("- [Responsibility 1]\n")
+                    f.write("- [Responsibility 2]\n\n")
+                    f.write("## Requirements\n")
+                    f.write("- [Requirement 1]\n")
+                    f.write("- [Requirement 2]\n\n")
+                    f.write("## Nice to Have\n")
+                    f.write("- [Nice to have 1]\n")
+                    f.write("- [Nice to have 2]\n\n")
+                    f.write("## Benefits\n")
+                    f.write("[Benefits information]\n")
+            
+            results["created"].append({
+                "id": application.id,
+                "company": company_name,
+                "role": role,
+                "url": url,
+                "salary_range": salary_range,
+                "directory": str(app_dir.relative_to(APPLICATIONS_DIR))
+            })
+            
+        except Exception as e:
+            results["failed"].append({
+                "url": url,
+                "error": str(e)
+            })
+    
+    return {
+        "summary": {
+            "created": len(results["created"]),
+            "skipped": len(results["skipped"]),
+            "failed": len(results["failed"])
+        },
+        "details": results
+    }

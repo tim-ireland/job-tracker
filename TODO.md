@@ -486,6 +486,96 @@
 
 ## Completed ✅
 
+### ✅ Pipeline Stat Card Filter (March 19, 2026)
+**Added dedicated Pipeline stat card with click-to-filter functionality!**
+
+**What's New:**
+- New stat card showing Pipeline application count (between Total and Applied)
+- Clickable card filters applications table to show only Pipeline status
+- Visual distinction with purple funnel icon (Solarized violet theme)
+- Active state highlighting when filter is enabled
+- Toggle behavior - click again to clear filter
+
+**Perfect for Bulk Scoring Workflow:**
+- Click Pipeline card to see all jobs awaiting evaluation
+- Verify which jobs need scoring before running bulk score
+- Focus on unscored jobs when preparing applications
+- Quick way to check Pipeline count at a glance
+
+**UI Layout:**
+```
+[Total] [Pipeline] [Applied] [Screening] [Interviews] [Offers] [Rejected]
+   0        2         6          1           3          0         2
+```
+
+**Files Modified:**
+- `job_tracker/templates/index.html` - Added Pipeline stat card HTML
+- `job_tracker/static/app.js` - Updated dashboard and filter logic
+- `job_tracker/static/style.css` - Added Pipeline card styling
+
+**Technical Implementation:**
+- Reuses existing stat card filter infrastructure
+- No API changes needed (dashboard already returns Pipeline count)
+- Filter index mapping updated to include Pipeline at position 1
+- Icon color customization for visual distinction
+
+### ✅ Bulk Job Scoring System (March 19, 2026)
+**Complete end-to-end scoring system for evaluating job fit!**
+
+**Phase 1 - Database Migration:**
+- Added Alembic for database migrations
+- Created migration adding 6 new match scoring fields to applications table
+- Fields: match_score, match_reasoning, match_strengths, match_gaps, match_recommendation, evaluated_at
+- Added `migrate` command to job-tracker wrapper
+
+**Phase 2 - Scoring Engine:**
+- Created `job_tracker/scoring.py` module with JobScorer class
+- Generates bulk scoring prompts with candidate background + job descriptions
+- Parses AI responses (handles markdown-wrapped JSON)
+- Loads resume summary and source material for context
+- Returns database-ready format with timestamps
+- Created comprehensive documentation in `docs/BULK_JOB_SCORING_PROMPT.md`
+
+**Phase 3 - Backend API:**
+- Added 3 new API endpoints:
+  - `POST /api/applications/bulk-score` - Generate scoring prompt for Pipeline jobs
+  - `POST /api/applications/parse-scores` - Parse AI response and update database
+  - `POST /api/applications/{id}/score` - Score single application
+- Updated Pydantic models to include match_score fields
+- All endpoints tested and working
+
+**Phase 4 - Frontend UI:**
+- Added Actions dropdown menu replacing single "Add Application" button
+- Created 3-step bulk scoring modal workflow
+- Added Match Score column to applications table (between Role and Priority)
+- Color-coded badges: Green (80-100), Blue (70-79), Yellow (60-69), Orange (50-59), Red (<50)
+- Clickable badges show details (score, reasoning, strengths, gaps)
+- Sortable match score column
+- Added dropdown and badge styles to CSS
+- Implemented complete JavaScript workflow handlers
+
+**How It Works:**
+1. User clicks "Actions" → "Score Pipeline Jobs"
+2. System generates prompt with all Pipeline applications + candidate background
+3. User copies prompt, pastes into Claude/ChatGPT/local LLM
+4. AI returns JSON with scores, reasoning, strengths, gaps for each job
+5. User pastes response back, system parses and updates database
+6. Match scores appear in table with color-coded badges
+7. Click badge to see full details
+
+**Benefits:**
+- **Time Savings:** Score 40 jobs in 30 minutes vs 5-10 hours manual review
+- **Data-Driven:** Prioritize high-scoring matches
+- **Strategic Insights:** Pattern recognition on what roles fit best
+- **Focus Effort:** Customize only top-scoring applications
+
+**Files Created/Modified:**
+- Database: Added match_score fields via Alembic migration
+- Backend: `job_tracker/scoring.py`, updated `job_tracker/app.py`, `job_tracker/models.py`
+- Frontend: Updated `templates/index.html`, `static/style.css`, `static/app.js`
+- Documentation: `docs/BULK_JOB_SCORING_PROMPT.md`
+- Infrastructure: `alembic.ini`, `alembic/env.py`, `alembic/script.py.mako`
+
 ### ✅ Simplify Container Workflow (March 18, 2026)
 - Created `job-tracker` wrapper script for easy command execution
 - Added container detection to all scripts (prevents running outside container)
@@ -590,3 +680,36 @@
 ---
 
 *This TODO file should be updated as tasks are completed or priorities change.*
+
+## Bulk Import Feature - Completed
+
+### Implementation Summary
+✅ Backend API endpoint `/api/applications/bulk-import`
+   - Accepts array of URLs
+   - Validates and skips LinkedIn job posting URLs
+   - Attempts to extract company name and role from page title
+   - Creates company if it doesn't exist
+   - Creates application entry in database
+   - Creates application directory structure
+   - Generates job_description.txt template
+
+✅ Frontend UI
+   - Bulk Import button in Actions dropdown
+   - Modal with URL textarea input
+   - LinkedIn URL warning
+   - Progress indicator during import
+   - Detailed results display (created, skipped, failed)
+   - Auto-refresh applications table after successful import
+
+### How to Use
+1. Click "Actions" → "Bulk Import URLs"
+2. Paste job URLs (one per line)
+3. Click "Import"
+4. Review results
+5. Edit job_description.txt files with actual content
+6. Run "Score Pipeline Jobs" to evaluate matches
+
+### Next Steps
+- Consider adding automatic job description scraping
+- Add retry mechanism for failed URLs
+- Support for more URL patterns/formats
