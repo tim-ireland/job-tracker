@@ -164,6 +164,20 @@ Provide honest, actionable scoring that helps prioritize where to invest applica
                 json_str = ai_response
         
         try:
+            # Clean control characters from JSON string more aggressively
+            # Remove all literal control characters (newlines, tabs, etc.)
+            import string
+            # Create translation table to remove control characters except spaces
+            control_chars = ''.join(c for c in map(chr, range(32)) if c not in '\t\n\r')
+            trans_table = str.maketrans('', '', control_chars)
+            json_str = json_str.translate(trans_table)
+            
+            # Now replace newlines and tabs with spaces
+            json_str = json_str.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+            # Normalize multiple spaces
+            json_str = re.sub(r'\s+', ' ', json_str)
+            
+            # Parse JSON
             data = json.loads(json_str)
             evaluations = data.get('evaluations', [])
             

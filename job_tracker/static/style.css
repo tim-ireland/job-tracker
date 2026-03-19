@@ -198,6 +198,18 @@ body {
     color: var(--primary-color);
 }
 
+#pipelineCard h3 i {
+    color: var(--sol-violet);
+}
+
+#pipelineCard:hover h3 i {
+    color: var(--primary-color);
+}
+
+#pipelineCard.active-filter h3 i {
+    color: var(--sol-violet);
+}
+
 .stat-card .value {
     font-size: 32px;
     font-weight: 700;

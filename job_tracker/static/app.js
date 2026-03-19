@@ -148,6 +148,7 @@ async function loadDashboard() {
         const response = await fetch(`${API_BASE}/dashboard`);
         const data = await response.json();
         document.getElementById('totalApps').textContent = data.total_applications;
+        document.getElementById('pipelineApps').textContent = data.by_status.Pipeline || 0;
         const appliedCount = (data.by_status.Applied || 0) + (data.by_status.Screening || 0);
         document.getElementById('appliedApps').textContent = appliedCount;
         document.getElementById('screeningApps').textContent = data.by_status.Screening || 0;
@@ -173,11 +174,42 @@ function setupDashboardFilters() {
         let filterStatus = null;
         switch(index) {
             case 0: filterStatus = null; break;  // Total - no filter
-            case 1: filterStatus = 'Applied+Screening'; break;  // Applied (includes Screening)
-            case 2: filterStatus = 'Screening'; break;
-            case 3: filterStatus = 'Interview'; break;
-            case 4: filterStatus = 'Offer'; break;
-            case 5: filterStatus = 'Rejected'; break;
+            case 1: filterStatus = 'Pipeline'; break;  // Pipeline
+            case 2: filterStatus = 'Applied+Screening'; break;  // Applied (includes Screening)
+            case 3: filterStatus = 'Screening'; break;
+            case 4: filterStatus = 'Interview'; break;
+            case 5: filterStatus = 'Offer'; break;
+            case 6: filterStatus = 'Rejected'; break;
+        }
+        
+        card.onclick = () => {
+            // Toggle filter
+            if (statusFilter === filterStatus) {
+                statusFilter = null;  // Clear filter
+                statCards.forEach(c => c.classList.remove('active-filter'));
+            } else {
+                statusFilter = filterStatus;
+                statCards.forEach(c => c.classList.remove('active-filter'));
+                card.classList.add('active-filter');
+                
+                // Auto-enable show closed if filtering for rejected
+                if (filterStatus === 'Rejected') {
+                    showClosedApps = true;
+                    document.getElementById('showClosedApps').checked = true;
+                }
+            }
+            
+            updateApplicationList();
+        };
+        
+        // Hover effect
+        card.onmouseenter = () => {
+            if (statusFilter !== filterStatus) {
+                card.style.transform = 'translateY(-2px)';
+            }
+        };
+        card.onmouseleave = () => {
+            card.style.transform = 'translateY(0)';
         }
         
         card.onclick = () => {

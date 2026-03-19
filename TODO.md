@@ -486,6 +486,39 @@
 
 ## Completed ✅
 
+### ✅ Pipeline Stat Card Filter (March 19, 2026)
+**Added dedicated Pipeline stat card with click-to-filter functionality!**
+
+**What's New:**
+- New stat card showing Pipeline application count (between Total and Applied)
+- Clickable card filters applications table to show only Pipeline status
+- Visual distinction with purple funnel icon (Solarized violet theme)
+- Active state highlighting when filter is enabled
+- Toggle behavior - click again to clear filter
+
+**Perfect for Bulk Scoring Workflow:**
+- Click Pipeline card to see all jobs awaiting evaluation
+- Verify which jobs need scoring before running bulk score
+- Focus on unscored jobs when preparing applications
+- Quick way to check Pipeline count at a glance
+
+**UI Layout:**
+```
+[Total] [Pipeline] [Applied] [Screening] [Interviews] [Offers] [Rejected]
+   0        2         6          1           3          0         2
+```
+
+**Files Modified:**
+- `job_tracker/templates/index.html` - Added Pipeline stat card HTML
+- `job_tracker/static/app.js` - Updated dashboard and filter logic
+- `job_tracker/static/style.css` - Added Pipeline card styling
+
+**Technical Implementation:**
+- Reuses existing stat card filter infrastructure
+- No API changes needed (dashboard already returns Pipeline count)
+- Filter index mapping updated to include Pipeline at position 1
+- Icon color customization for visual distinction
+
 ### ✅ Bulk Job Scoring System (March 19, 2026)
 **Complete end-to-end scoring system for evaluating job fit!**
 
