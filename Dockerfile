@@ -21,6 +21,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY job_tracker/ ./job_tracker/
 COPY templates/ ./templates/
 COPY scripts/ ./scripts/
+COPY alembic/ ./alembic/
+COPY alembic.ini .
 
 # Create data directory mount point
 RUN mkdir -p /data/applications /data/source_material

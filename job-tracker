@@ -43,6 +43,13 @@ Commands:
       List all applications
       Example: $0 list
 
+  migrate <create|upgrade|downgrade|history|current>
+      Database migrations with Alembic
+      Examples:
+        $0 migrate create "add match scoring"
+        $0 migrate upgrade
+        $0 migrate downgrade
+
   sync
       Sync applications from filesystem to database
       Example: $0 sync
@@ -66,7 +73,7 @@ case "${1:-}" in
         usage
         exit 0
         ;;
-    shell|create|customize|compile|list|sync)
+    shell|create|customize|compile|list|migrate|sync)
         check_container
         ;;
 esac
@@ -90,6 +97,43 @@ case "${1:-}" in
     
     list)
         docker exec -it "$CONTAINER_NAME" scripts/list_applications.sh
+        ;;
+    
+    migrate)
+        shift
+        case "${1:-}" in
+            create)
+                shift
+                message="${1:-auto_migration}"
+                echo "Creating migration: $message"
+                docker exec -it "$CONTAINER_NAME" bash -c "cd /app && alembic revision --autogenerate -m '$message'"
+                ;;
+            upgrade)
+                echo "Running migrations..."
+                docker exec -it "$CONTAINER_NAME" bash -c "cd /app && alembic upgrade head"
+                ;;
+            downgrade)
+                echo "Rolling back migration..."
+                docker exec -it "$CONTAINER_NAME" bash -c "cd /app && alembic downgrade -1"
+                ;;
+            history)
+                docker exec -it "$CONTAINER_NAME" bash -c "cd /app && alembic history"
+                ;;
+            current)
+                docker exec -it "$CONTAINER_NAME" bash -c "cd /app && alembic current"
+                ;;
+            *)
+                echo "Usage: $0 migrate <create|upgrade|downgrade|history|current> [message]"
+                echo ""
+                echo "Examples:"
+                echo "  $0 migrate create \"add match scoring\""
+                echo "  $0 migrate upgrade"
+                echo "  $0 migrate downgrade"
+                echo "  $0 migrate history"
+                echo "  $0 migrate current"
+                exit 1
+                ;;
+        esac
         ;;
     
     sync)

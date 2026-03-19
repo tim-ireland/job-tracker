@@ -59,6 +59,15 @@ class Application(Base):
     date_offer = Column(DateTime)
     date_closed = Column(DateTime)
     notes = Column(Text)
+    
+    # Match scoring fields for bulk job evaluation
+    match_score = Column(Integer)
+    match_reasoning = Column(Text)
+    match_strengths = Column(Text)  # JSON array as string
+    match_gaps = Column(Text)  # JSON array as string
+    match_recommendation = Column(String)  # Apply|Skip|Reach
+    evaluated_at = Column(DateTime)
+    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
