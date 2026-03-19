@@ -282,7 +282,7 @@ function updateApplicationList() {
     }
     
     if (filteredApps.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7">No applications to display</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8">No applications to display</td></tr>';
         return;
     }
     
@@ -296,6 +296,7 @@ function updateApplicationList() {
             <tr onclick="viewApplication(${app.id})" style="cursor: pointer;">
                 <td><strong>${escapeHtml(companyName)}</strong></td>
                 <td>${roleDisplay}</td>
+                <td onclick="event.stopPropagation()">${renderMatchScore(app)}</td>
                 <td><span class="badge badge-${app.priority.toLowerCase()}">${app.priority}</span></td>
                 <td><span class="badge badge-${app.status.toLowerCase()}">${app.status}</span></td>
                 <td>${app.salary_range ? escapeHtml(app.salary_range) : '-'}</td>
@@ -848,4 +849,203 @@ async function handleFileUpload(applicationId, files) {
             progressDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
         }, 3000);
     }
+}
+
+// ==================== BULK JOB SCORING ====================
+
+// Actions dropdown toggle
+document.getElementById('actionsDropdownBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('actionsDropdownMenu');
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', () => {
+    const menu = document.getElementById('actionsDropdownMenu');
+    if (menu) menu.style.display = 'none';
+});
+
+// Score Pipeline Jobs button
+document.getElementById('scorePipelineBtn')?.addEventListener('click', () => {
+    document.getElementById('actionsDropdownMenu').style.display = 'none';
+    openModal('bulkScoringModal');
+    resetScoringModal();
+});
+
+// Bulk Import button
+document.getElementById('bulkImportBtn')?.addEventListener('click', () => {
+    document.getElementById('actionsDropdownMenu').style.display = 'none';
+    openModal('bulkImportModal');
+});
+
+function resetScoringModal() {
+    document.getElementById('scoringStep1').style.display = 'block';
+    document.getElementById('scoringStep2').style.display = 'none';
+    document.getElementById('scoringStep3').style.display = 'none';
+    document.getElementById('promptStatus').style.display = 'none';
+    document.getElementById('parseStatus').style.display = 'none';
+    document.getElementById('scoringPrompt').value = '';
+    document.getElementById('aiResponse').value = '';
+}
+
+// Generate Prompt button
+document.getElementById('generatePromptBtn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('generatePromptBtn');
+    const status = document.getElementById('promptStatus');
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+    status.style.display = 'block';
+    status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Fetching Pipeline applications...';
+    
+    try {
+        const response = await fetch(`${API_BASE}/applications/bulk-score`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status_filter: 'Pipeline', use_api: false })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to generate prompt');
+        }
+        
+        const data = await response.json();
+        
+        document.getElementById('scoringPrompt').value = data.prompt;
+        document.getElementById('promptAppCount').textContent = data.application_count;
+        
+        // Show step 2 and 3
+        document.getElementById('scoringStep2').style.display = 'block';
+        document.getElementById('scoringStep3').style.display = 'block';
+        
+        status.innerHTML = `<i class="fas fa-check-circle" style="color: var(--success-color);"></i> Generated prompt for ${data.application_count} applications`;
+        
+    } catch (error) {
+        console.error('Error generating prompt:', error);
+        status.innerHTML = `<i class="fas fa-times-circle" style="color: var(--danger-color);"></i> Error: ${error.message}`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-magic"></i> Generate Scoring Prompt';
+    }
+});
+
+// Copy Prompt button
+document.getElementById('copyPromptBtn')?.addEventListener('click', async () => {
+    const prompt = document.getElementById('scoringPrompt').value;
+    const btn = document.getElementById('copyPromptBtn');
+    
+    try {
+        await navigator.clipboard.writeText(prompt);
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+        }, 2000);
+    } catch (error) {
+        console.error('Failed to copy:', error);
+        alert('Failed to copy to clipboard');
+    }
+});
+
+// Parse Scores button
+document.getElementById('parseScoresBtn')?.addEventListener('click', async () => {
+    const aiResponse = document.getElementById('aiResponse').value.trim();
+    const btn = document.getElementById('parseScoresBtn');
+    const status = document.getElementById('parseStatus');
+    
+    if (!aiResponse) {
+        status.style.display = 'block';
+        status.innerHTML = '<i class="fas fa-exclamation-triangle" style="color: var(--warning-color);"></i> Please paste the AI response';
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Parsing...';
+    status.style.display = 'block';
+    status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating database...';
+    
+    try {
+        const response = await fetch(`${API_BASE}/applications/parse-scores`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ai_response: aiResponse })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to parse scores');
+        }
+        
+        const data = await response.json();
+        
+        status.innerHTML = `<i class="fas fa-check-circle" style="color: var(--success-color);"></i> Updated ${data.updated} applications` +
+            (data.failed > 0 ? ` <span style="color: var(--warning-color);">(${data.failed} failed)</span>` : '');
+        
+        // Reload applications table
+        setTimeout(() => {
+            loadApplications();
+            closeModal('bulkScoringModal');
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Error parsing scores:', error);
+        status.innerHTML = `<i class="fas fa-times-circle" style="color: var(--danger-color);"></i> Error: ${error.message}`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-database"></i> Parse & Update Scores';
+    }
+});
+
+// Render match score badge
+function renderMatchScore(app) {
+    if (!app.match_score) {
+        return '<span class="match-score-none">—</span>';
+    }
+    
+    const score = app.match_score;
+    let badgeClass = 'match-score-poor';
+    
+    if (score >= 80) badgeClass = 'match-score-excellent';
+    else if (score >= 70) badgeClass = 'match-score-strong';
+    else if (score >= 60) badgeClass = 'match-score-good';
+    else if (score >= 50) badgeClass = 'match-score-moderate';
+    
+    const tooltip = app.match_reasoning ? `data-tooltip="${escapeHtml(app.match_reasoning)}"` : '';
+    
+    return `<span class="match-score-badge ${badgeClass}" ${tooltip} onclick="showMatchDetails(${app.id})">${score}</span>`;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML.replace(/"/g, '&quot;');
+}
+
+function showMatchDetails(appId) {
+    // Find the application
+    const app = applications.find(a => a.id === appId);
+    if (!app || !app.match_score) return;
+    
+    // Show details in a simple alert for now (could be a modal later)
+    let message = `Match Score: ${app.match_score}\n`;
+    message += `Recommendation: ${app.match_recommendation || 'N/A'}\n\n`;
+    message += `Reasoning:\n${app.match_reasoning || 'N/A'}\n\n`;
+    
+    if (app.match_strengths) {
+        try {
+            const strengths = JSON.parse(app.match_strengths);
+            message += `Strengths:\n${strengths.map(s => `• ${s}`).join('\n')}\n\n`;
+        } catch (e) {}
+    }
+    
+    if (app.match_gaps) {
+        try {
+            const gaps = JSON.parse(app.match_gaps);
+            message += `Gaps:\n${gaps.map(g => `• ${g}`).join('\n')}`;
+        } catch (e) {}
+    }
+    
+    alert(message);
 }
