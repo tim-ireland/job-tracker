@@ -1,7 +1,7 @@
 #!/bin/bash
 # Start MCP server in background
 echo "Starting MCP server on port ${MCP_PORT:-3000}"
-job-tracker-mcp &
+job-tracker-mcp 2>&1 &
 MCP_PID=$!
 
 # Start uvicorn (foreground)
