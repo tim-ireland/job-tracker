@@ -1,3 +1,10 @@
+# ── Stage 1: Build the Rust MCP server ───────────────────────────────────────
+FROM rust:latest AS rust-builder
+WORKDIR /build
+COPY mcp-server/ .
+RUN cargo build --release
+
+# ── Stage 2: Final image ──────────────────────────────────────────────────────
 FROM python:3.11-slim
 
 # Install LaTeX and other dependencies
@@ -23,6 +30,9 @@ COPY templates/ ./templates/
 COPY scripts/ ./scripts/
 COPY alembic/ ./alembic/
 COPY alembic.ini .
+
+# Copy MCP server binary from builder stage
+COPY --from=rust-builder /build/target/release/job-tracker-mcp /usr/local/bin/job-tracker-mcp
 
 # Create data directory mount point
 RUN mkdir -p /data/applications /data/source_material
