@@ -330,7 +330,7 @@ body {
 
 .btn-primary {
     background: var(--primary-color);
-    color: white;
+    color: var(--sol-base03);
     border-color: var(--primary-color);
 }
 
@@ -341,7 +341,7 @@ body {
 
 .btn-secondary {
     background: var(--gray-6);
-    color: white;
+    color: var(--sol-base03);
     border-color: var(--gray-6);
 }
 
@@ -352,7 +352,7 @@ body {
 
 .btn-info {
     background: #5ba4d8;
-    color: white;
+    color: var(--sol-base03);
     border-color: #5ba4d8;
 }
 
@@ -374,7 +374,7 @@ body {
 
 .btn-success {
     background: var(--success-color);
-    color: white;
+    color: var(--sol-base03);
     border-color: var(--success-color);
 }
 
@@ -583,6 +583,94 @@ tbody tr {
 
 tr:hover {
     background: var(--bg-tertiary);
+}
+
+.col-personal-rank {
+    display: none;
+}
+
+.row-checkbox,
+#selectAllCheckbox,
+#showClosedApps {
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    accent-color: var(--sol-base01);
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: var(--sol-base01);
+    border: 1px solid var(--sol-base00);
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.row-checkbox:checked,
+#selectAllCheckbox:checked,
+#showClosedApps:checked {
+    background-color: var(--sol-base0);
+    border-color: var(--sol-base0);
+}
+
+.row-checkbox:checked::after,
+#selectAllCheckbox:checked::after,
+#showClosedApps:checked::after {
+    content: '✓';
+    font-size: 11px;
+    color: var(--sol-base03);
+    line-height: 1;
+}
+
+#bulk-delete-cell .btn-sm {
+    padding: 2px 6px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.loc-icon {
+    display: inline-block;
+    font-size: 15px;
+    line-height: 1;
+    cursor: default;
+    user-select: none;
+}
+.loc-remote { color: #2aa198; }   /* teal  */
+.loc-hybrid  { color: #cb4b16; }  /* orange */
+.loc-onsite  { color: #6c71c4; }  /* violet */
+.loc-unknown { color: var(--text-muted); }
+
+.star-rating {
+    display: inline-flex;
+    gap: 2px;
+    line-height: 1;
+}
+
+.star {
+    font-size: 16px;
+    cursor: pointer;
+    transition: color 0.1s, transform 0.1s;
+    user-select: none;
+}
+
+.star-filled {
+    color: var(--sol-yellow);
+}
+
+.star-empty {
+    color: var(--border-color);
+}
+
+.star:hover,
+.star-rating:hover .star {
+    color: var(--sol-yellow);
+    transform: scale(1.15);
+}
+
+.star-rating:hover .star:hover ~ .star {
+    color: var(--border-color);
+    transform: scale(1);
 }
 
 .badge {

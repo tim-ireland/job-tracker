@@ -3,7 +3,7 @@ Database models for job tracking application
 """
 import os
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
@@ -60,6 +60,9 @@ class Application(Base):
     date_closed = Column(DateTime)
     notes = Column(Text)
     
+    # Personal ranking (1-5 stars, user-defined)
+    personal_rank = Column(Integer)
+
     # Match scoring fields for bulk job evaluation
     match_score = Column(Integer)
     match_reasoning = Column(Text)
@@ -176,6 +179,12 @@ class Offer(Base):
 def init_db():
     """Initialize database with tables"""
     Base.metadata.create_all(bind=engine)
+    # Safe migrations for columns added after initial creation
+    with engine.connect() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(applications)")).fetchall()]
+        if "personal_rank" not in cols:
+            conn.execute(text("ALTER TABLE applications ADD COLUMN personal_rank INTEGER"))
+            conn.commit()
 
 
 def get_db():

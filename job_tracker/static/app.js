@@ -83,16 +83,20 @@ function setupTagFilters() {
     const companyNames = [...new Set(companies.map(c => c.name))].sort();
     const roleNames    = [...new Set(applications.map(a => a.role).filter(Boolean))].sort();
 
-    tagFilters['company'] = [];
-    tagFilters['role']    = [];
-    tagFilters['status']  = [];
+    const LOCATION_OPTIONS = ['Remote', 'Hybrid', 'On-site'];
 
-    new TomSelect('#filter-company', tsConfig('company', companyNames, true));
-    new TomSelect('#filter-role',    tsConfig('role',    roleNames,    true));
-    new TomSelect('#filter-status',  tsConfig('status',  STATUS_OPTIONS, false));
+    tagFilters['company']  = [];
+    tagFilters['role']     = [];
+    tagFilters['status']   = [];
+    tagFilters['location'] = [];
+
+    new TomSelect('#filter-company',  tsConfig('company',  companyNames,     true));
+    new TomSelect('#filter-role',     tsConfig('role',     roleNames,        true));
+    new TomSelect('#filter-status',   tsConfig('status',   STATUS_OPTIONS,   false));
+    new TomSelect('#filter-location', tsConfig('location', LOCATION_OPTIONS, false));
 
     // Prevent clicks inside tag filters from bubbling to sort headers
-    ['filter-company', 'filter-role', 'filter-status'].forEach(id => {
+    ['filter-company', 'filter-role', 'filter-status', 'filter-location'].forEach(id => {
         document.getElementById(id)?.closest('th')
             ?.addEventListener('click', e => e.stopPropagation());
     });
@@ -159,6 +163,10 @@ function sortApplications() {
                 aVal = a.match_score || 0;
                 bVal = b.match_score || 0;
                 break;
+            case 'personal_rank':
+                aVal = a.personal_rank || 0;
+                bVal = b.personal_rank || 0;
+                break;
             case 'priority':
                 // P1 < P2 < P3 < P4 < P5
                 // Handle both "P1" format and other text (e.g., "Medium")
@@ -173,6 +181,10 @@ function sortApplications() {
             case 'status':
                 aVal = a.status.toLowerCase();
                 bVal = b.status.toLowerCase();
+                break;
+            case 'location':
+                aVal = (a.remote_policy || '').toLowerCase();
+                bVal = (b.remote_policy || '').toLowerCase();
                 break;
             case 'salary':
                 aVal = a.salary_range || '';
@@ -383,6 +395,8 @@ function updateApplicationList() {
                 value = app.role || '';
             } else if (col === 'status') {
                 value = app.status || '';
+            } else if (col === 'location') {
+                value = app.remote_policy || '';
             }
             return tags.some(tag => value.toLowerCase().includes(tag.toLowerCase()));
         });
@@ -407,36 +421,34 @@ function updateApplicationList() {
     });
     
     if (filteredApps.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8">No applications to display</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10">No applications to display</td></tr>';
         return;
     }
-    
+
     tbody.innerHTML = filteredApps.map(app => {
         const company = companies.find(c => c.id === app.company_id);
         const companyName = company ? company.name : 'Unknown';
-        const roleDisplay = app.job_url 
+        const roleDisplay = app.job_url
             ? `<a href="${escapeHtml(app.job_url)}" target="_blank" onclick="event.stopPropagation()" style="color: inherit; text-decoration: underline;">${escapeHtml(app.role)}</a>`
             : escapeHtml(app.role);
         return `
-            <tr onclick="viewApplication(${app.id})" style="cursor: pointer;">
+            <tr onclick="editApplication(${app.id})" style="cursor: pointer;" data-app-id="${app.id}">
+                <td onclick="event.stopPropagation()" style="text-align:center;">
+                    <input type="checkbox" class="row-checkbox" data-id="${app.id}" onchange="updateBulkDeleteBtn()">
+                </td>
                 <td><strong>${escapeHtml(companyName)}</strong></td>
                 <td>${roleDisplay}</td>
                 <td onclick="event.stopPropagation()">${renderMatchScore(app)}</td>
+                <td class="col-personal-rank" onclick="event.stopPropagation()">${renderStars(app.id, app.personal_rank)}</td>
                 <td><span class="badge badge-${app.priority.toLowerCase()}">${app.priority}</span></td>
                 <td><span class="badge badge-${app.status.toLowerCase()}">${app.status}</span></td>
                 <td>${app.salary_range ? escapeHtml(app.salary_range) : '-'}</td>
+                <td style="text-align:center;">${renderLocationIcon(app.remote_policy)}</td>
                 <td>${app.date_applied ? new Date(app.date_applied).toLocaleDateString() : '-'}</td>
-                <td onclick="event.stopPropagation()">
-                    <button class="btn btn-info btn-sm" onclick="editApplication(${app.id})">
-                        <i class="fas fa-edit"></i> Edit
-                    </button>
-                    <button class="btn btn-danger btn-sm" onclick="deleteApplication(${app.id})">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
-                </td>
             </tr>
         `;
     }).join('');
+    updateBulkDeleteBtn();
 }
 
 function openApplicationModal(applicationId = null, viewOnly = false) {
@@ -499,7 +511,7 @@ function openApplicationModal(applicationId = null, viewOnly = false) {
 }
 
 function viewApplication(applicationId) {
-    openApplicationModal(applicationId, true);
+    openApplicationModal(applicationId, false);
 }
 
 function editApplication(applicationId) {
@@ -694,9 +706,43 @@ function editCompany(id) {
     openCompanyModal(id);
 }
 
+function toggleSelectAll(checkbox) {
+    document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = checkbox.checked);
+    updateBulkDeleteBtn();
+}
+
+function updateBulkDeleteBtn() {
+    const selected = document.querySelectorAll('.row-checkbox:checked');
+    const cell = document.getElementById('bulk-delete-cell');
+    if (!cell) return;
+    if (selected.length > 0) {
+        cell.innerHTML = `<button class="btn btn-danger btn-sm" onclick="deleteSelected()" title="Delete ${selected.length} selected">
+            <i class="fas fa-trash"></i> ${selected.length}
+        </button>`;
+    } else {
+        cell.innerHTML = '';
+        const selectAll = document.getElementById('selectAllCheckbox');
+        if (selectAll) selectAll.checked = false;
+    }
+}
+
+async function deleteSelected() {
+    const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+    if (checkboxes.length === 0) return;
+    if (!confirm(`Delete ${checkboxes.length} application(s)?`)) return;
+    const ids = [...checkboxes].map(cb => parseInt(cb.dataset.id));
+    try {
+        await Promise.all(ids.map(id => fetch(`${API_BASE}/applications/${id}`, { method: 'DELETE' })));
+        loadApplications();
+        loadDashboard();
+    } catch (error) {
+        console.error('Error deleting applications:', error);
+    }
+}
+
 async function deleteApplication(id) {
     if (!confirm('Delete this application?')) return;
-    
+
     try {
         await fetch(`${API_BASE}/applications/${id}`, { method: 'DELETE' });
         loadApplications();
@@ -1168,6 +1214,43 @@ function renderMatchScore(app) {
     const tooltip = app.match_reasoning ? `data-tooltip="${escapeHtml(app.match_reasoning)}"` : '';
     
     return `<span class="match-score-badge ${badgeClass}" ${tooltip} onclick="showMatchDetails(${app.id})">${score}</span>`;
+}
+
+function renderLocationIcon(policy) {
+    if (!policy) return '<span class="loc-icon loc-unknown" title="Unknown">?</span>';
+    const p = policy.toLowerCase();
+    if (p.includes('remote')) return '<span class="loc-icon loc-remote" title="Remote">⌂</span>';
+    if (p.includes('hybrid')) return '<span class="loc-icon loc-hybrid" title="Hybrid">⇌</span>';
+    if (p.includes('on') || p.includes('office') || p.includes('onsite') || p.includes('in-person'))
+        return '<span class="loc-icon loc-onsite" title="On-site">⊙</span>';
+    return `<span class="loc-icon loc-unknown" title="${policy}">?</span>`;
+}
+
+function renderStars(appId, rank) {
+    const stars = [1, 2, 3, 4, 5].map(i => {
+        const filled = rank && i <= rank;
+        return `<span class="star ${filled ? 'star-filled' : 'star-empty'}" onclick="setPersonalRank(${appId}, ${i})" data-app="${appId}" data-val="${i}">★</span>`;
+    }).join('');
+    return `<span class="star-rating">${stars}</span>`;
+}
+
+async function setPersonalRank(appId, rank) {
+    // Clicking the active rank clears it
+    const app = applications.find(a => a.id === appId);
+    const newRank = app && app.personal_rank === rank ? null : rank;
+    try {
+        const response = await fetch(`${API_BASE}/applications/${appId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ personal_rank: newRank }),
+        });
+        const updated = await response.json();
+        const idx = applications.findIndex(a => a.id === appId);
+        if (idx !== -1) applications[idx] = updated;
+        updateApplicationList();
+    } catch (err) {
+        console.error('Error setting rank:', err);
+    }
 }
 
 function escapeHtml(text) {

@@ -74,6 +74,7 @@ class ApplicationUpdate(BaseModel):
     date_offer: Optional[datetime] = None
     date_closed: Optional[datetime] = None
     notes: Optional[str] = None
+    personal_rank: Optional[int] = None
 
 
 class Application(ApplicationBase):
@@ -83,6 +84,7 @@ class Application(ApplicationBase):
     date_interview: Optional[datetime] = None
     date_offer: Optional[datetime] = None
     date_closed: Optional[datetime] = None
+    personal_rank: Optional[int] = None
     match_score: Optional[int] = None
     match_reasoning: Optional[str] = None
     match_strengths: Optional[str] = None

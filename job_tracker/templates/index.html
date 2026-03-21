@@ -105,6 +105,9 @@
                 <table>
                     <thead>
                         <tr>
+                            <th style="width: 36px; text-align: center;">
+                                <input type="checkbox" id="selectAllCheckbox" title="Select all" onclick="toggleSelectAll(this)">
+                            </th>
                             <th class="sortable" data-sort="company" style="cursor: pointer;">
                                 <i class="fas fa-building"></i> Company
                                 <i class="fas fa-sort sort-icon"></i>
@@ -117,6 +120,10 @@
                                 <i class="fas fa-bullseye"></i> Match
                                 <i class="fas fa-sort sort-icon"></i>
                             </th>
+                            <th class="sortable col-personal-rank" data-sort="personal_rank" style="cursor: pointer;">
+                                <i class="fas fa-star"></i> Rank
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
                             <th class="sortable" data-sort="priority" style="cursor: pointer;">
                                 <i class="fas fa-star"></i> Priority
                                 <i class="fas fa-sort sort-icon"></i>
@@ -125,29 +132,34 @@
                                 <i class="fas fa-tasks"></i> Status
                                 <i class="fas fa-sort sort-icon"></i>
                             </th>
-                            <th class="sortable" data-sort="salary" style="cursor: pointer;">
-                                <i class="fas fa-dollar-sign"></i> Salary Range
+                            <th class="sortable" data-sort="salary" style="cursor: pointer; width: 120px;">
+                                <i class="fas fa-dollar-sign"></i> Salary
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="location" style="cursor: pointer; width: 48px; text-align: center;">
+                                <i class="fas fa-map-pin"></i>
                                 <i class="fas fa-sort sort-icon"></i>
                             </th>
                             <th class="sortable" data-sort="date" style="cursor: pointer;">
                                 <i class="fas fa-calendar"></i> Applied
                                 <i class="fas fa-sort sort-icon"></i>
                             </th>
-                            <th><i class="fas fa-cog"></i> Actions</th>
                         </tr>
                         <tr class="filter-row">
+                            <th id="bulk-delete-cell" style="text-align: center;"></th>
                             <th><select id="filter-company" multiple placeholder="Filter…"></select></th>
                             <th><select id="filter-role" multiple placeholder="Filter…"></select></th>
                             <th><input type="text" class="col-filter" data-col="match_score" placeholder="Filter…"></th>
+                            <th class="col-personal-rank"></th>
                             <th><input type="text" class="col-filter" data-col="priority" placeholder="Filter…"></th>
                             <th><select id="filter-status" multiple placeholder="Filter…"></select></th>
                             <th><input type="text" class="col-filter" data-col="salary" placeholder="Filter…"></th>
+                            <th><select id="filter-location" multiple placeholder="Filter…"></select></th>
                             <th><input type="text" class="col-filter" data-col="date" placeholder="Filter…"></th>
-                            <th></th>
                         </tr>
                     </thead>
                     <tbody id="applicationTableBody">
-                        <tr><td colspan="8">Loading...</td></tr>
+                        <tr><td colspan="10" id="appTableLoadingMsg">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
