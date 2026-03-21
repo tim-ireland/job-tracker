@@ -109,13 +109,25 @@ def create_application(application: models.ApplicationCreate, db: Session = Depe
 
 @app.put("/api/applications/{application_id}", response_model=models.Application)
 def update_application(
-    application_id: int, 
-    application: models.ApplicationUpdate, 
+    application_id: int,
+    application: models.ApplicationUpdate,
     db: Session = Depends(get_db)
 ):
+    # Capture old directory path before update
+    existing = crud.get_application(db, application_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Application not found")
+    old_dir = APPLICATIONS_DIR / f"{existing.company.name.replace(' ', '_')}_{existing.role.replace(' ', '_').replace('/', '_')}"
+
     updated = crud.update_application(db, application_id, application)
     if not updated:
         raise HTTPException(status_code=404, detail="Application not found")
+
+    # Rename directory if company or role changed
+    new_dir = APPLICATIONS_DIR / f"{updated.company.name.replace(' ', '_')}_{updated.role.replace(' ', '_').replace('/', '_')}"
+    if old_dir != new_dir and old_dir.exists() and not new_dir.exists():
+        old_dir.rename(new_dir)
+
     return updated
 
 
@@ -751,8 +763,15 @@ def bulk_score_applications(request: BulkScoreRequest, db: Session = Depends(get
         job_description = ""
         if job_desc_path.exists():
             with open(job_desc_path, 'r') as f:
-                job_description = f.read()
-        
+                raw = f.read()
+            # Discard nav-only content from JS-rendered pages
+            job_keywords = ['responsibilities', 'requirements', 'qualifications', 'experience',
+                            'engineer', 'manager', 'developer', 'skills', 'team', 'role',
+                            'apply', 'position', 'salary', 'compensation', 'benefits']
+            keyword_hits = sum(1 for kw in job_keywords if kw in raw.lower())
+            if keyword_hits >= 3:
+                job_description = raw
+
         app_data.append({
             'id': app.id,
             'company': app.company.name,
@@ -939,15 +958,90 @@ def bulk_import_applications(urls: List[str] = Body(..., embed=True), db: Sessio
                 title = soup.find('title')
                 role = title.get_text().strip() if title else "Unknown Role"
                 
-                # Clean up common title patterns
+                # Try to extract company from title suffix BEFORE stripping it
+                # Titles are often "Role Title - Company Name"
+                from urllib.parse import urlparse
+                title_company = None
+                title_suffix_match = re.search(r'\s*[-|]\s*(.+)$', role)
+                if title_suffix_match:
+                    title_company = title_suffix_match.group(1).strip()
+
+                # Clean up role
                 role = re.sub(r'\s*[-|]\s*.*$', '', role)  # Remove "- Company Name" suffix
                 role = role[:100]  # Limit length
-                
-                # Try to extract company from URL domain
-                from urllib.parse import urlparse
-                domain = urlparse(url).netloc
-                company_name = domain.replace('www.', '').split('.')[0].title()
-                
+
+                # Smart company extraction from URL
+                domain = urlparse(url).netloc.lower()
+                path = urlparse(url).path.strip('/')
+
+                # Known special-case domains
+                SPECIAL_DOMAINS = {
+                    'metacareers.com': 'Meta',
+                    'pinterestcareers.com': 'Pinterest',
+                    'careers.google.com': 'Google',
+                    'amazon.jobs': 'Amazon',
+                }
+
+                # ATS/job board hosts where company is the first path segment
+                PATH_BASED_ATS = [
+                    'jobs.ashbyhq.com', 'ats.rippling.com', 'job-boards.greenhouse.io',
+                    'boards.greenhouse.io', 'jobs.lever.co', 'apply.workable.com',
+                    'jobs.smartrecruiters.com', 'jobs.jobvite.com',
+                ]
+
+                # ATS hosts where company is a subdomain (e.g. company.jibeapply.com)
+                SUBDOMAIN_ATS = ['jibeapply.com', 'myworkdayjobs.com', 'workday.com']
+
+                # Subdomains that indicate a careers site, not the company name
+                GENERIC_SUBDOMAINS = {
+                    'careers', 'jobs', 'job', 'explore', 'apply', 'work',
+                    'hiring', 'ats', 'job-boards', 'boards', 'recruit',
+                    'hr', 'talent', 'opportunities',
+                }
+
+                company_name = None
+
+                # 1. Check special cases
+                for special, name in SPECIAL_DOMAINS.items():
+                    if special in domain:
+                        company_name = name
+                        break
+
+                if not company_name:
+                    # 2. Path-based ATS: company is first path segment
+                    for ats in PATH_BASED_ATS:
+                        if domain == ats or domain.endswith('.' + ats):
+                            parts = [p for p in path.split('/') if p]
+                            if parts:
+                                company_name = parts[0].replace('-', ' ').title()
+                            break
+
+                if not company_name:
+                    # 3. Subdomain-based ATS: company is subdomain
+                    for ats in SUBDOMAIN_ATS:
+                        if domain.endswith('.' + ats):
+                            subdomain = domain[:-len(ats) - 1]
+                            # Strip numeric workday prefixes (wd1, wd3, etc.)
+                            subdomain = re.sub(r'^wd\d+\.', '', subdomain)
+                            company_name = subdomain.replace('-', ' ').title()
+                            break
+
+                if not company_name:
+                    # 4. Generic career subdomain: strip it and use the base domain
+                    parts = domain.split('.')
+                    # Remove TLDs and generic subdomains, keep meaningful parts
+                    meaningful = [p for p in parts if p not in GENERIC_SUBDOMAINS
+                                  and p not in ('www', 'com', 'net', 'org', 'io', 'co', 'ai')]
+                    if meaningful:
+                        company_name = meaningful[0].title()
+
+                if not company_name:
+                    # 5. Fall back to title suffix if we captured one
+                    company_name = title_company or domain.split('.')[0].title()
+
+                # Strip common legal entity suffixes (e.g. "Githubinc" → "Github")
+                company_name = re.sub(r'(?i)(inc|llc|corp|ltd|co)$', '', company_name).strip()
+
             # Check if company exists, create if not
             company = crud.get_company_by_name(db, company_name)
             if not company:
@@ -979,6 +1073,15 @@ def bulk_import_applications(urls: List[str] = Body(..., embed=True), db: Sessio
                 body = soup.find('body')
                 if body:
                     job_content = body.get_text(separator='\n', strip=True)
+
+            # Discard content that looks like nav/shell only (JS-rendered pages)
+            job_keywords = ['responsibilities', 'requirements', 'qualifications', 'experience',
+                            'engineer', 'manager', 'developer', 'skills', 'team', 'role',
+                            'apply', 'position', 'salary', 'compensation', 'benefits']
+            if job_content:
+                keyword_hits = sum(1 for kw in job_keywords if kw in job_content.lower())
+                if keyword_hits < 3:
+                    job_content = ""
 
             # Try to extract salary range from content
             salary_range = None
