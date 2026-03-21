@@ -20,6 +20,8 @@ CONTAINER_NAME="${CONTAINER_NAME:-job-search-tracker}"
 DATA_DIR="${DATA_DIR:-../my-job-search-2026}"
 HOST_PORT="${HOST_PORT:-8000}"
 CONTAINER_PORT="${CONTAINER_PORT:-8000}"
+MCP_HOST_PORT="${MCP_HOST_PORT:-3000}"
+MCP_CONTAINER_PORT="${MCP_CONTAINER_PORT:-3000}"
 
 # Runtime configuration
 DETACH=true
@@ -36,6 +38,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --port)
             HOST_PORT="$2"
+            shift 2
+            ;;
+        --mcp-port)
+            MCP_HOST_PORT="$2"
             shift 2
             ;;
         --dev)
@@ -64,6 +70,7 @@ Run the Job Search Toolkit Docker container.
 Options:
   --data-dir PATH      Path to data directory (default: ../my-job-search-2026)
   --port PORT          Host port to bind (default: 8000)
+  --mcp-port PORT      Host port for MCP server (default: 3000)
   --dev                Enable development mode (live code reloading)
   --foreground, -f     Run in foreground (don't detach)
   --interactive, -i    Run interactive shell (with TTY)
@@ -149,6 +156,7 @@ DOCKER_RUN_CMD="$DOCKER_RUN_CMD --name ${CONTAINER_NAME}"
 
 # Port mapping
 DOCKER_RUN_CMD="$DOCKER_RUN_CMD -p ${HOST_PORT}:${CONTAINER_PORT}"
+DOCKER_RUN_CMD="$DOCKER_RUN_CMD -p ${MCP_HOST_PORT}:${MCP_CONTAINER_PORT}"
 
 # Volume mount
 DOCKER_RUN_CMD="$DOCKER_RUN_CMD -v ${DATA_DIR_ABS}:/data"
@@ -202,7 +210,7 @@ echo "Configuration:"
 echo "  Image:          ${IMAGE_NAME}:${IMAGE_TAG}"
 echo "  Container:      ${CONTAINER_NAME}"
 echo "  Data directory: ${DATA_DIR_ABS}"
-echo "  Port mapping:   ${HOST_PORT}:${CONTAINER_PORT}"
+echo "  Port mapping:   ${HOST_PORT}:${CONTAINER_PORT} (app), ${MCP_HOST_PORT}:${MCP_CONTAINER_PORT} (MCP)"
 echo "  Mode:           $([ "$DETACH" = true ] && echo "detached" || echo "foreground")"
 if [ "$DEV_MODE" = true ]; then
     echo "  Development:    ENABLED (live code reloading)"
