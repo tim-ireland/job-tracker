@@ -7,6 +7,7 @@ use rmcp::{
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
+use tokio::process::Command as AsyncCommand;
 
 // ── Parameter structs ─────────────────────────────────────────────────────────
 
@@ -173,6 +174,32 @@ struct ScheduleInterviewParams {
     notes: Option<String>,
 }
 
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct CreateApplicationParams {
+    /// Company name (e.g. "Figma")
+    company_name: String,
+    /// Job title — underscores preferred (e.g. "Engineering_Manager_Observability")
+    job_title: String,
+    /// Resume template type: base, manager, director, developer (default: base)
+    template: Option<String>,
+    /// Link to the job posting
+    job_url: Option<String>,
+    /// Office location
+    location: Option<String>,
+    /// Priority P1 (highest) through P4 (lowest). Defaults to P4.
+    priority: Option<String>,
+    /// Remote policy (e.g. "Remote", "Hybrid", "On-site")
+    remote_policy: Option<String>,
+    /// Salary range (e.g. "$150k-$180k")
+    salary_range: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct ApplicationDirParams {
+    /// Application directory name as created by create_application (e.g. "Figma_Engineering_Manager_Observability")
+    directory_name: String,
+}
+
 // ── Server ────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
@@ -180,15 +207,46 @@ struct JobTrackerServer {
     tool_router: ToolRouter<Self>,
     client: reqwest::Client,
     base_url: String,
+    data_dir: String,
+    scripts_dir: String,
 }
 
 // Helper methods (not tools)
 impl JobTrackerServer {
-    fn new(base_url: String) -> Self {
+    fn new(base_url: String, data_dir: String, scripts_dir: String) -> Self {
         Self {
             tool_router: Self::tool_router(),
             client: reqwest::Client::new(),
             base_url,
+            data_dir,
+            scripts_dir,
+        }
+    }
+
+    async fn run_script(&self, script: &str, args: &[String]) -> String {
+        let script_path = format!("{}/{}", self.scripts_dir, script);
+        eprintln!("[mcp] running {} {:?}", script_path, args);
+        match AsyncCommand::new(&script_path)
+            .args(args)
+            .env("DATA_DIR", &self.data_dir)
+            .env("FORCE_RUN", "1")
+            .output()
+            .await
+        {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                if output.status.success() {
+                    stdout
+                } else {
+                    let code = output.status.code().unwrap_or(-1);
+                    let mut msg = format!("Script failed (exit {code})");
+                    if !stdout.is_empty() { msg.push_str(&format!("\n{stdout}")); }
+                    if !stderr.is_empty() { msg.push_str(&format!("\nstderr: {stderr}")); }
+                    msg
+                }
+            }
+            Err(e) => format!("Failed to run '{script_path}': {e}"),
         }
     }
 
@@ -512,6 +570,64 @@ impl JobTrackerServer {
         }
     }
 
+    #[tool(description = "Create an application directory with tailored resume and cover letter templates. \
+        Copies the appropriate LaTeX template (base/manager/director/developer), creates a job_description.txt \
+        placeholder, and registers the application in the database. \
+        Returns the directory path — edit resume.tex and cover_letter.tex there, then call compile_application.")]
+    async fn create_application(
+        &self,
+        Parameters(params): Parameters<CreateApplicationParams>,
+    ) -> String {
+        let template = params.template.as_deref().unwrap_or("base").to_string();
+        let mut args = vec![params.company_name, params.job_title, template];
+        if let Some(v) = params.job_url      { args.push(format!("--job-url={v}")); }
+        if let Some(v) = params.location     { args.push(format!("--location={v}")); }
+        if let Some(v) = params.priority     { args.push(format!("--priority={v}")); }
+        if let Some(v) = params.remote_policy { args.push(format!("--remote-policy={v}")); }
+        if let Some(v) = params.salary_range { args.push(format!("--salary-range={v}")); }
+        self.run_script("create_application.sh", &args).await
+    }
+
+    #[tool(description = "List files in an application directory. \
+        Returns the absolute directory path and all files with their sizes. \
+        Use the returned paths to read and edit resume.tex / cover_letter.tex directly.")]
+    async fn get_application_files(
+        &self,
+        Parameters(ApplicationDirParams { directory_name }): Parameters<ApplicationDirParams>,
+    ) -> String {
+        let app_dir = format!("{}/applications/{}", self.data_dir, directory_name);
+        match std::fs::read_dir(&app_dir) {
+            Ok(entries) => {
+                let mut files: Vec<Value> = entries
+                    .flatten()
+                    .map(|e| {
+                        let name = e.file_name().to_string_lossy().to_string();
+                        let path = e.path().to_string_lossy().to_string();
+                        let size = e.metadata().map(|m| m.len()).unwrap_or(0);
+                        json!({ "name": name, "path": path, "size_bytes": size })
+                    })
+                    .collect();
+                files.sort_by(|a, b| {
+                    a["name"].as_str().unwrap_or("").cmp(b["name"].as_str().unwrap_or(""))
+                });
+                serde_json::to_string_pretty(&json!({ "directory": app_dir, "files": files }))
+                    .unwrap_or_else(|e| e.to_string())
+            }
+            Err(e) => format!("Error reading '{}': {e}", app_dir),
+        }
+    }
+
+    #[tool(description = "Compile resume.tex and cover_letter.tex into PDFs for an application. \
+        Runs pdflatex twice per document (for cross-references), embeds PDF metadata, and cleans up \
+        auxiliary files. Call this after editing the .tex files. \
+        Returns compilation output including success/failure for each document.")]
+    async fn compile_application(
+        &self,
+        Parameters(ApplicationDirParams { directory_name }): Parameters<ApplicationDirParams>,
+    ) -> String {
+        self.run_script("compile_application.sh", &[directory_name]).await
+    }
+
     #[tool(description = "Update an existing interview. Use this to mark an interview as completed, \
         reschedule it, add debrief notes, or update interviewer details. \
         completed accepts \"Yes\" or \"No\".")]
@@ -559,7 +675,10 @@ impl ServerHandler for JobTrackerServer {
             instructions: Some(
                 "Job search tracker MCP server. \
                 Use these tools to manage your pipeline: add applications, log interactions, \
-                schedule interviews, and compare offers — all from the terminal."
+                schedule interviews, and compare offers — all from the terminal. \
+                For tailored application documents: use create_application to scaffold a directory \
+                with LaTeX templates, edit the .tex files directly, then call compile_application \
+                to produce PDFs. Use get_application_files to discover file paths in an application directory."
                     .into(),
             ),
         }
@@ -572,6 +691,10 @@ impl ServerHandler for JobTrackerServer {
 async fn main() -> anyhow::Result<()> {
     let base_url = std::env::var("JOB_TRACKER_URL")
         .unwrap_or_else(|_| "http://localhost:8000".to_string());
+    let data_dir = std::env::var("DATA_DIR")
+        .unwrap_or_else(|_| "/data".to_string());
+    let scripts_dir = std::env::var("SCRIPTS_DIR")
+        .unwrap_or_else(|_| "/app/scripts".to_string());
     let mcp_port: u16 = std::env::var("MCP_PORT")
         .ok()
         .and_then(|p| p.parse().ok())
@@ -581,7 +704,9 @@ async fn main() -> anyhow::Result<()> {
     println!("MCP server listening on :{mcp_port}");
 
     let sse_server = SseServer::serve(bind_addr).await?;
-    let ct = sse_server.with_service(move || JobTrackerServer::new(base_url.clone()));
+    let ct = sse_server.with_service(move || {
+        JobTrackerServer::new(base_url.clone(), data_dir.clone(), scripts_dir.clone())
+    });
     ct.cancelled().await;
     Ok(())
 }

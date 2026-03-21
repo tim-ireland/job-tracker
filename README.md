@@ -252,8 +252,6 @@ The export captures ALL job search activity that progressed during the week, inc
 
 The toolkit includes a Rust-based MCP (Model Context Protocol) server that lets you manage your job search pipeline directly from Claude Code using natural language.
 
-See [docs/MCP_SERVER.md](docs/MCP_SERVER.md) for full setup and usage details.
-
 ### Quick Setup
 
 The MCP server binary is built into the Docker image automatically. To connect Claude Code to it:
@@ -291,6 +289,18 @@ Once connected, you can talk to your job search data naturally:
 "Which applications are still in Pipeline status?"
 "Compare my current offers"
 ```
+
+Claude can also prepare tailored application documents end-to-end:
+
+```
+"Create a manager-template application for Figma, Engineering Manager - Observability,
+ P2 priority, salary $250k-$350k. Here's the job description: [paste]
+ Customize the resume to highlight observability and Datadog experience, then compile it."
+```
+
+This scaffolds the application directory with LaTeX templates, edits `resume.tex` and `cover_letter.tex` to match the role, compiles both to PDF, and registers the application in the database — all in one conversation turn.
+
+See [docs/MCP_SERVER.md](docs/MCP_SERVER.md) for the full document workflow and all available tools.
 
 ## Development
 

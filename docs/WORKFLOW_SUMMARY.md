@@ -1,12 +1,50 @@
 # Job Search Toolkit - Workflow Summary
 
-**Last Updated:** March 18, 2026
+**Last Updated:** March 21, 2026
+
+---
+
+## Recommended: MCP-Driven Workflow (Claude Code)
+
+The fastest path uses the MCP server to let Claude handle every automated step in a single conversation. No shell commands, no copy-paste between tools.
+
+### Full example
+
+```
+"Create a manager-template application for Red Hat, ROSA Service EM,
+ P2 priority, salary $148k-$245k. Here's the job description: [paste]
+ Customize the resume to highlight Kubernetes and cloud infrastructure work,
+ then compile it."
+```
+
+Claude will:
+1. Call `create_application` — scaffolds directory, copies templates, creates DB entry
+2. Read the job description you pasted
+3. Edit `resume.tex` and `cover_letter.tex` to match the role
+4. Call `compile_application` — runs pdflatex, embeds PDF metadata
+
+Then after your review:
+```
+"Looks good. Mark it as Applied, today's date, resume_filename resume.pdf"
+```
+
+### Time with MCP workflow
+
+| Step | Time | Who |
+|------|------|-----|
+| Paste job description + prompt | 1 min | You |
+| Claude scaffolds, customizes, compiles | 1-2 min | Claude |
+| Review PDFs and verify accuracy | 3-5 min | You (critical) |
+| Mark Applied via MCP | 10 sec | Claude |
+| **Total** | **~5-8 min** | |
+
+See [MCP_SERVER.md](MCP_SERVER.md) for setup and full tool reference.
 
 ---
 
 ## Complete Application Workflow
 
-### Current State: Semi-Automated
+### Legacy: Semi-Automated (Shell Scripts)
 
 The workflow combines automated tooling with necessary human review steps to ensure quality and truthfulness.
 
