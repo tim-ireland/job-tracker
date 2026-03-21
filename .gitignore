@@ -29,6 +29,9 @@ htmlcov/
 dist/
 build/
 
+# Rust/Cargo build output
+mcp-server/target/
+
 # Logs
 *.log
 
