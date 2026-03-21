@@ -16,6 +16,10 @@ struct ListApplicationsParams {
     status: Option<String>,
     /// Filter by priority: P1, P2, P3, P4
     priority: Option<String>,
+    /// Maximum number of results to return (default: 50)
+    limit: Option<i64>,
+    /// Number of results to skip for pagination (default: 0)
+    offset: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -189,38 +193,56 @@ impl JobTrackerServer {
     }
 
     async fn api_get(&self, path: &str) -> Result<Value, String> {
-        self.client
+        let resp = self.client
             .get(format!("{}{}", self.base_url, path))
             .send()
             .await
-            .map_err(|e| e.to_string())?
-            .json()
+            .map_err(|e| e.to_string())?;
+        let status = resp.status();
+        eprintln!("[mcp] GET {} -> {}", path, status);
+        resp.json().await.map_err(|e| e.to_string())
+    }
+
+    /// Like api_get but also returns the X-Total-Count header value if present.
+    async fn api_get_with_count(&self, path: &str) -> Result<(Value, Option<i64>), String> {
+        let resp = self.client
+            .get(format!("{}{}", self.base_url, path))
+            .send()
             .await
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?;
+        let status = resp.status();
+        eprintln!("[mcp] GET {} -> {}", path, status);
+        let total = resp
+            .headers()
+            .get("x-total-count")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<i64>().ok());
+        let body = resp.json().await.map_err(|e| e.to_string())?;
+        Ok((body, total))
     }
 
     async fn api_post(&self, path: &str, body: Value) -> Result<Value, String> {
-        self.client
+        let resp = self.client
             .post(format!("{}{}", self.base_url, path))
             .json(&body)
             .send()
             .await
-            .map_err(|e| e.to_string())?
-            .json()
-            .await
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?;
+        let status = resp.status();
+        eprintln!("[mcp] POST {} -> {}", path, status);
+        resp.json().await.map_err(|e| e.to_string())
     }
 
     async fn api_put(&self, path: &str, body: Value) -> Result<Value, String> {
-        self.client
+        let resp = self.client
             .put(format!("{}{}", self.base_url, path))
             .json(&body)
             .send()
             .await
-            .map_err(|e| e.to_string())?
-            .json()
-            .await
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?;
+        let status = resp.status();
+        eprintln!("[mcp] PUT {} -> {}", path, status);
+        resp.json().await.map_err(|e| e.to_string())
     }
 
     /// Look up a company by name, creating it if it doesn't exist.
@@ -254,20 +276,54 @@ impl JobTrackerServer {
         }
     }
 
-    #[tool(description = "List job applications. Optionally filter by status (Pipeline/Applied/Screening/Interview/Offer/Closed) or priority (P1-P4).")]
+    #[tool(description = "List job applications (summary view). Optionally filter by status \
+        (Pipeline/Applied/Screening/Interview/Offer/Closed) or priority (P1-P4). \
+        Supports pagination via limit (default 50) and offset (default 0). \
+        Returns {total, limit, offset, has_more, items}. \
+        If has_more is true, call again with offset += limit to fetch the next page. \
+        Items omit verbose fields like match_reasoning and notes.")]
     async fn list_applications(
         &self,
-        Parameters(ListApplicationsParams { status, priority }): Parameters<ListApplicationsParams>,
+        Parameters(ListApplicationsParams { status, priority, limit, offset }): Parameters<ListApplicationsParams>,
     ) -> String {
-        let mut path = "/api/applications?limit=200".to_string();
-        if let Some(s) = status {
+        let limit = limit.unwrap_or(50);
+        let offset = offset.unwrap_or(0);
+        let mut path = format!("/api/applications?limit={limit}&skip={offset}");
+        if let Some(s) = &status {
             path.push_str(&format!("&status={s}"));
         }
-        if let Some(p) = priority {
+        if let Some(p) = &priority {
             path.push_str(&format!("&priority={p}"));
         }
-        match self.api_get(&path).await {
-            Ok(v) => serde_json::to_string_pretty(&v).unwrap_or_else(|e| e.to_string()),
+        match self.api_get_with_count(&path).await {
+            Ok((Value::Array(apps), total)) => {
+                let items: Vec<Value> = apps
+                    .into_iter()
+                    .map(|mut a| {
+                        for field in &[
+                            "match_reasoning", "match_strengths", "match_gaps",
+                            "notes", "cover_letter_filename", "resume_filename",
+                            "hiring_manager_name", "hiring_manager_email",
+                            "created_at", "updated_at",
+                        ] {
+                            a.as_object_mut().map(|o| o.remove(*field));
+                        }
+                        a
+                    })
+                    .collect();
+                let count = items.len() as i64;
+                let total = total.unwrap_or(count + offset);
+                let has_more = offset + count < total;
+                let envelope = json!({
+                    "total": total,
+                    "limit": limit,
+                    "offset": offset,
+                    "has_more": has_more,
+                    "items": items,
+                });
+                serde_json::to_string(&envelope).unwrap_or_else(|e| e.to_string())
+            }
+            Ok((v, _)) => serde_json::to_string(&v).unwrap_or_else(|e| e.to_string()),
             Err(e) => format!("Error listing applications: {e}"),
         }
     }

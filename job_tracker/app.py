@@ -4,7 +4,7 @@ FastAPI application for job tracking
 from fastapi import FastAPI, Depends, HTTPException, Request, Body, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse, StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pathlib import Path
@@ -108,13 +108,17 @@ def delete_company(company_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/applications", response_model=List[models.Application])
 def list_applications(
-    skip: int = 0, 
-    limit: int = 100, 
+    skip: int = 0,
+    limit: int = 100,
     status: Optional[str] = None,
     priority: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    return crud.get_applications(db, skip=skip, limit=limit, status=status, priority=priority)
+    items = crud.get_applications(db, skip=skip, limit=limit, status=status, priority=priority)
+    total = crud.count_applications(db, status=status, priority=priority)
+    # Serialize via Pydantic so the response_model validation still applies
+    data = [models.Application.model_validate(item).model_dump(mode="json") for item in items]
+    return JSONResponse(content=data, headers={"X-Total-Count": str(total)})
 
 
 @app.get("/api/applications/{application_id}", response_model=models.Application)

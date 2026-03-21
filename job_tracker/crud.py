@@ -50,7 +50,7 @@ def delete_company(session: Session, company_id: int):
     return False
 
 
-def get_applications(session: Session, skip: int = 0, limit: int = 100, 
+def get_applications(session: Session, skip: int = 0, limit: int = 100,
                      status: Optional[str] = None, priority: Optional[str] = None):
     query = session.query(db.Application)
     if status:
@@ -58,6 +58,15 @@ def get_applications(session: Session, skip: int = 0, limit: int = 100,
     if priority:
         query = query.filter(db.Application.priority == priority)
     return query.offset(skip).limit(limit).all()
+
+
+def count_applications(session: Session, status: Optional[str] = None, priority: Optional[str] = None) -> int:
+    query = session.query(db.Application)
+    if status:
+        query = query.filter(db.Application.status == status)
+    if priority:
+        query = query.filter(db.Application.priority == priority)
+    return query.count()
 
 
 def get_application(session: Session, application_id: int):
