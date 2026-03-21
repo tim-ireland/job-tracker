@@ -44,7 +44,7 @@ ENV DATA_DIR=/data \
     DATABASE_URL=sqlite:////data/job_applications.db
 
 # Expose port (configurable via environment)
-EXPOSE 8000
+EXPOSE 8000 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

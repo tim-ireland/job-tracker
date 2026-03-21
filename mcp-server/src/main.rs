@@ -3,7 +3,7 @@ use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{Implementation, ProtocolVersion, ServerCapabilities, ServerInfo},
     schemars, tool, tool_handler, tool_router,
-    transport::stdio,
+    transport::sse_server::SseServer,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -44,14 +44,36 @@ struct AddApplicationParams {
 struct UpdateApplicationParams {
     /// ID of the application to update
     id: i64,
-    /// New status value
+    /// New status: Pipeline, Applied, Screening, Interview, Offer, Closed
     status: Option<String>,
-    /// New priority value
+    /// New priority: P1, P2, P3, P4
     priority: Option<String>,
-    /// Updated notes
-    notes: Option<String>,
+    /// Job role/title
+    role: Option<String>,
+    /// Link to the job posting
+    job_url: Option<String>,
+    /// Office location
+    location: Option<String>,
+    /// Remote policy (e.g. "Remote", "Hybrid", "On-site")
+    remote_policy: Option<String>,
+    /// Salary range (e.g. "$150k-$180k")
+    salary_range: Option<String>,
+    /// Hiring manager's name
+    hiring_manager_name: Option<String>,
+    /// Hiring manager's email address
+    hiring_manager_email: Option<String>,
     /// Date applied (ISO 8601, e.g. 2026-03-20T00:00:00)
     date_applied: Option<String>,
+    /// Date screening occurred (ISO 8601)
+    date_screening: Option<String>,
+    /// Date first interview occurred (ISO 8601)
+    date_interview: Option<String>,
+    /// Date offer received (ISO 8601)
+    date_offer: Option<String>,
+    /// Date application was closed (ISO 8601)
+    date_closed: Option<String>,
+    /// Free-form notes
+    notes: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -73,6 +95,62 @@ struct LogInteractionParams {
 struct ApplicationIdParams {
     /// Application ID
     application_id: i64,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct CreateOfferParams {
+    /// ID of the application this offer belongs to
+    application_id: i64,
+    /// Base salary in whole dollars (e.g. 200000 for $200k)
+    base_salary: Option<i64>,
+    /// Annual bonus target in whole dollars
+    bonus_target: Option<i64>,
+    /// Signing bonus in whole dollars
+    signing_bonus: Option<i64>,
+    /// Total equity value in whole dollars
+    equity_value: Option<i64>,
+    /// Equity details (vesting schedule, cliff, etc.)
+    equity_details: Option<String>,
+    /// Total annual compensation in whole dollars
+    total_comp: Option<i64>,
+    /// Offer date (ISO 8601, e.g. 2026-03-20T00:00:00)
+    offer_date: Option<String>,
+    /// Deadline to respond (ISO 8601)
+    response_deadline: Option<String>,
+    /// PTO days per year
+    pto_days: Option<i64>,
+    /// Start date (ISO 8601)
+    start_date: Option<String>,
+    /// Remote policy (e.g. "Remote", "Hybrid", "On-site")
+    remote_policy: Option<String>,
+    /// Offer status: Pending, Accepted, Declined, Negotiating. Defaults to Pending.
+    status: Option<String>,
+    /// Free-form notes about the offer
+    notes: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct UpdateInterviewParams {
+    /// ID of the interview to update
+    id: i64,
+    /// Mark as completed: "Yes" or "No"
+    completed: Option<String>,
+    /// Updated date and time (ISO 8601, e.g. 2026-03-25T14:00:00)
+    scheduled_date: Option<String>,
+    /// Type: phone, video, onsite, technical, behavioral, other
+    interview_type: Option<String>,
+    /// Name of the interviewer
+    interviewer_name: Option<String>,
+    /// Email of the interviewer
+    interviewer_email: Option<String>,
+    /// Title/role of the interviewer
+    interviewer_title: Option<String>,
+    /// Physical location (for onsite interviews)
+    location: Option<String>,
+    /// Zoom/Meet/Teams link
+    meeting_link: Option<String>,
+    /// Notes or debrief
+    notes: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -228,16 +306,30 @@ impl JobTrackerServer {
         }
     }
 
-    #[tool(description = "Update an existing application's status, priority, notes, or date_applied.")]
+    #[tool(description = "Update an existing application. Supports status, priority, role, job_url, \
+        location, remote_policy, salary_range, hiring_manager_name, hiring_manager_email, \
+        date_applied, date_screening, date_interview, date_offer, date_closed, and notes.")]
     async fn update_application(
         &self,
-        Parameters(UpdateApplicationParams { id, status, priority, notes, date_applied }): Parameters<UpdateApplicationParams>,
+        Parameters(params): Parameters<UpdateApplicationParams>,
     ) -> String {
+        let id = params.id;
         let mut body = json!({});
-        if let Some(v) = &status { body["status"] = json!(v); }
-        if let Some(v) = &priority { body["priority"] = json!(v); }
-        if let Some(v) = &notes { body["notes"] = json!(v); }
-        if let Some(v) = &date_applied { body["date_applied"] = json!(v); }
+        if let Some(v) = params.status               { body["status"] = json!(v); }
+        if let Some(v) = params.priority              { body["priority"] = json!(v); }
+        if let Some(v) = params.role                  { body["role"] = json!(v); }
+        if let Some(v) = params.job_url               { body["job_url"] = json!(v); }
+        if let Some(v) = params.location              { body["location"] = json!(v); }
+        if let Some(v) = params.remote_policy         { body["remote_policy"] = json!(v); }
+        if let Some(v) = params.salary_range          { body["salary_range"] = json!(v); }
+        if let Some(v) = params.hiring_manager_name   { body["hiring_manager_name"] = json!(v); }
+        if let Some(v) = params.hiring_manager_email  { body["hiring_manager_email"] = json!(v); }
+        if let Some(v) = params.date_applied          { body["date_applied"] = json!(v); }
+        if let Some(v) = params.date_screening        { body["date_screening"] = json!(v); }
+        if let Some(v) = params.date_interview        { body["date_interview"] = json!(v); }
+        if let Some(v) = params.date_offer            { body["date_offer"] = json!(v); }
+        if let Some(v) = params.date_closed           { body["date_closed"] = json!(v); }
+        if let Some(v) = params.notes                 { body["notes"] = json!(v); }
 
         match self.api_put(&format!("/api/applications/{id}"), body).await {
             Ok(v) => format!(
@@ -327,6 +419,72 @@ impl JobTrackerServer {
             Err(e) => format!("Error fetching offer comparison: {e}"),
         }
     }
+
+    #[tool(description = "Record a job offer received for an application. Provide compensation \
+        details: base salary, bonus, signing bonus, equity, total comp (all in whole dollars, \
+        e.g. 200000 for $200k), plus offer date, response deadline, PTO days, start date, \
+        remote policy, and notes.")]
+    async fn create_offer(
+        &self,
+        Parameters(params): Parameters<CreateOfferParams>,
+    ) -> String {
+        let mut body = json!({ "application_id": params.application_id });
+        if let Some(v) = params.base_salary        { body["base_salary"] = json!(v); }
+        if let Some(v) = params.bonus_target       { body["bonus_target"] = json!(v); }
+        if let Some(v) = params.signing_bonus      { body["signing_bonus"] = json!(v); }
+        if let Some(v) = params.equity_value       { body["equity_value"] = json!(v); }
+        if let Some(v) = params.equity_details     { body["equity_details"] = json!(v); }
+        if let Some(v) = params.total_comp         { body["total_comp"] = json!(v); }
+        if let Some(v) = params.offer_date         { body["offer_date"] = json!(v); }
+        if let Some(v) = params.response_deadline  { body["response_deadline"] = json!(v); }
+        if let Some(v) = params.pto_days           { body["pto_days"] = json!(v); }
+        if let Some(v) = params.start_date         { body["start_date"] = json!(v); }
+        if let Some(v) = params.remote_policy      { body["remote_policy"] = json!(v); }
+        if let Some(v) = params.status             { body["status"] = json!(v); }
+        if let Some(v) = params.notes              { body["notes"] = json!(v); }
+
+        match self.api_post("/api/offers", body).await {
+            Ok(v) => format!(
+                "Created offer #{} for application #{} — base: ${}, total comp: ${}, deadline: {}",
+                v["id"].as_i64().unwrap_or(0),
+                params.application_id,
+                v["base_salary"].as_i64().unwrap_or(0),
+                v["total_comp"].as_i64().unwrap_or(0),
+                v["response_deadline"].as_str().unwrap_or("not set"),
+            ),
+            Err(e) => format!("Error creating offer: {e}"),
+        }
+    }
+
+    #[tool(description = "Update an existing interview. Use this to mark an interview as completed, \
+        reschedule it, add debrief notes, or update interviewer details. \
+        completed accepts \"Yes\" or \"No\".")]
+    async fn update_interview(
+        &self,
+        Parameters(params): Parameters<UpdateInterviewParams>,
+    ) -> String {
+        let id = params.id;
+        let mut body = json!({});
+        if let Some(v) = params.completed          { body["completed"] = json!(v); }
+        if let Some(v) = params.scheduled_date     { body["scheduled_date"] = json!(v); }
+        if let Some(v) = params.interview_type     { body["interview_type"] = json!(v); }
+        if let Some(v) = params.interviewer_name   { body["interviewer_name"] = json!(v); }
+        if let Some(v) = params.interviewer_email  { body["interviewer_email"] = json!(v); }
+        if let Some(v) = params.interviewer_title  { body["interviewer_title"] = json!(v); }
+        if let Some(v) = params.location           { body["location"] = json!(v); }
+        if let Some(v) = params.meeting_link       { body["meeting_link"] = json!(v); }
+        if let Some(v) = params.notes              { body["notes"] = json!(v); }
+
+        match self.api_put(&format!("/api/interviews/{id}"), body).await {
+            Ok(v) => format!(
+                "Updated interview #{id} — type: {}, completed: {}, date: {}",
+                v["interview_type"].as_str().unwrap_or("?"),
+                v["completed"].as_str().unwrap_or("?"),
+                v["scheduled_date"].as_str().unwrap_or("not scheduled"),
+            ),
+            Err(e) => format!("Error updating interview #{id}: {e}"),
+        }
+    }
 }
 
 // ── ServerHandler ─────────────────────────────────────────────────────────────
@@ -358,8 +516,16 @@ impl ServerHandler for JobTrackerServer {
 async fn main() -> anyhow::Result<()> {
     let base_url = std::env::var("JOB_TRACKER_URL")
         .unwrap_or_else(|_| "http://localhost:8000".to_string());
+    let mcp_port: u16 = std::env::var("MCP_PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(3000);
 
-    let server = JobTrackerServer::new(base_url);
-    server.serve(stdio()).await?.waiting().await?;
+    let bind_addr: std::net::SocketAddr = format!("0.0.0.0:{mcp_port}").parse()?;
+    println!("MCP server listening on :{mcp_port}");
+
+    let sse_server = SseServer::serve(bind_addr).await?;
+    let ct = sse_server.with_service(move || JobTrackerServer::new(base_url.clone()));
+    ct.cancelled().await;
     Ok(())
 }
