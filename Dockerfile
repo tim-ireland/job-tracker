@@ -1,3 +1,10 @@
+# ── Stage 1: Build the Rust MCP server ───────────────────────────────────────
+FROM rust:latest AS rust-builder
+WORKDIR /build
+COPY mcp-server/ .
+RUN cargo build --release
+
+# ── Stage 2: Final image ──────────────────────────────────────────────────────
 FROM python:3.11-slim
 
 # Install LaTeX and other dependencies
@@ -24,6 +31,9 @@ COPY scripts/ ./scripts/
 COPY alembic/ ./alembic/
 COPY alembic.ini .
 
+# Copy MCP server binary from builder stage
+COPY --from=rust-builder /build/target/release/job-tracker-mcp /usr/local/bin/job-tracker-mcp
+
 # Create data directory mount point
 RUN mkdir -p /data/applications /data/source_material
 
@@ -34,7 +44,7 @@ ENV DATA_DIR=/data \
     DATABASE_URL=sqlite:////data/job_applications.db
 
 # Expose port (configurable via environment)
-EXPOSE 8000
+EXPOSE 8000 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

@@ -13,6 +13,7 @@ A comprehensive web-based job application tracking system with LaTeX resume gene
 - 📋 **MA DUA Export**: Export weekly activity reports for Massachusetts Department of Unemployment Assistance
 - 🎨 **Modern UI**: Clean, responsive interface with dark/light mode
 - 🐳 **Docker Support**: Containerized application with persistent data volumes
+- 🤖 **Claude Code MCP Server**: Drive your job search from the terminal using natural language via Claude Code
 
 ## Quick Start
 
@@ -245,6 +246,50 @@ The export captures ALL job search activity that progressed during the week, inc
 - Offers received
 - Applications closed (rejected/withdrawn/accepted)
 
+## Claude Code MCP Server
+
+The toolkit includes a Rust-based MCP (Model Context Protocol) server that lets you manage your job search pipeline directly from Claude Code using natural language.
+
+See [docs/MCP_SERVER.md](docs/MCP_SERVER.md) for full setup and usage details.
+
+### Quick Setup
+
+The MCP server binary is built into the Docker image automatically. To connect Claude Code to it:
+
+1. **Rebuild the image** (if you haven't since the MCP server was added):
+   ```bash
+   docker compose build
+   docker compose up -d
+   ```
+
+2. **Register the server** by adding this to `~/.claude/mcp.json`:
+   ```json
+   {
+     "mcpServers": {
+       "job-tracker": {
+         "command": "docker",
+         "args": ["exec", "-i", "-e", "JOB_TRACKER_URL=http://localhost:8000",
+                  "job-search-tracker", "/usr/local/bin/job-tracker-mcp"]
+       }
+     }
+   }
+   ```
+
+3. **Restart Claude Code** — the server loads at startup.
+
+### Example Usage
+
+Once connected, you can talk to your job search data naturally:
+
+```
+"Show me my pipeline summary"
+"Add an application for Stripe, Staff Engineer role, P1 priority"
+"Log that I had a call with the Google recruiter today"
+"Schedule a technical interview for my Stripe application on Friday at 2pm"
+"Which applications are still in Pipeline status?"
+"Compare my current offers"
+```
+
 ## Development
 
 ### Running Tests
@@ -281,6 +326,7 @@ This toolkit is designed to keep your personal job search data separate from the
 ## Support
 
 - 📖 [Documentation](docs/)
+- 🤖 [MCP Server Setup](docs/MCP_SERVER.md)
 - 🐛 [Issue Tracker](https://github.com/yourusername/job-search-toolkit/issues)
 - 💬 [Discussions](https://github.com/yourusername/job-search-toolkit/discussions)
 

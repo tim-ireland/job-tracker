@@ -25,7 +25,10 @@ class JobScorer:
             data_dir: Path to data directory containing resumes and source material
         """
         self.data_dir = data_dir
-        self.base_resume_path = os.path.join(data_dir, 'base_master_resume.tex')
+        # Check data dir root first, then templates/ subdirectory
+        _resume_root = os.path.join(data_dir, 'base_master_resume.tex')
+        _resume_templates = os.path.join(data_dir, 'templates', 'base_master_resume.tex')
+        self.base_resume_path = _resume_root if os.path.exists(_resume_root) else _resume_templates
         self.source_material_dir = os.path.join(data_dir, 'source_material')
     
     def generate_bulk_prompt(self, applications: List[Dict]) -> str:

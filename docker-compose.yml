@@ -6,6 +6,7 @@ services:
     container_name: job-search-tracker
     ports:
       - "${HOST_PORT:-8000}:8000"
+      - "${MCP_PORT:-3000}:3000"
     volumes:
       # Mount your personal data directory
       - ${DATA_PATH:-../my-job-search-2026}:/data
