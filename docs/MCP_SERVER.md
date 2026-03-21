@@ -2,62 +2,54 @@
 
 The job tracker includes a Rust-based [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that lets you manage your job search pipeline from Claude Code using natural language — no need to open the web UI for routine updates.
 
-## How It Works
+## Architecture
 
-The MCP server binary (`job-tracker-mcp`) is compiled as part of the Docker image and lives at `/usr/local/bin/job-tracker-mcp` inside the container. Claude Code connects to it via `docker exec`, communicating over stdio. The server calls the FastAPI app (`http://localhost:8000`) running in the same container.
+The MCP server is compiled as part of the Docker image and runs as a persistent SSE (Server-Sent Events) HTTP server on port 3000. Claude Code connects to it directly over HTTP.
 
 ```
-Claude Code  ──stdio──▶  docker exec  ──▶  job-tracker-mcp  ──HTTP──▶  FastAPI (port 8000)
-                          (container)
+Claude Code  ──SSE/HTTP──▶  job-tracker-mcp (port 3000)  ──HTTP──▶  FastAPI (port 8000)
+                              (inside Docker container)
 ```
 
-This means:
-- No extra ports to expose
-- The server is versioned and deployed alongside the app
-- You never need a local Rust toolchain
+Both the MCP server and the FastAPI backend run inside the same container. The MCP server calls the FastAPI API on `localhost:8000` internally.
 
 ## Setup
 
-### 1. Build the image
-
-The MCP server is compiled automatically during `docker build`. If you're updating from a version before MCP support was added, rebuild:
+### 1. Start the stack
 
 ```bash
-docker compose build
 docker compose up -d
 ```
 
-The first build takes a few minutes while Rust dependencies compile. Subsequent builds are fast unless `mcp-server/` changes.
+The MCP server starts automatically alongside the FastAPI app. Port 3000 is exposed to the host.
 
-### 2. Register with Claude Code
+First build takes a few minutes while Rust dependencies compile. Subsequent builds are fast unless `mcp-server/` changes.
 
-Add the following to `~/.claude/mcp.json` (create the file if it doesn't exist):
+### 2. Configure Claude Code
 
-```json
-{
-  "mcpServers": {
-    "job-tracker": {
-      "command": "docker",
-      "args": [
-        "exec", "-i",
-        "-e", "JOB_TRACKER_URL=http://localhost:8000",
-        "job-search-tracker",
-        "/usr/local/bin/job-tracker-mcp"
-      ]
-    }
-  }
-}
+The project ships with a `.mcp.json` at the repo root and a `.claude/settings.json` that auto-approves it. No manual configuration needed — Claude Code picks these up automatically when you open the project.
+
+If you want to verify the connection:
+
+```
+/mcp
 ```
 
-> **Note:** `job-search-tracker` is the container name defined in `docker-compose.yml`. If you've customized it, update the arg accordingly.
+You should see `job-tracker` listed as connected with 11 tools.
 
-### 3. Restart Claude Code
+### 3. Use it
 
-MCP servers are loaded at startup. Restart Claude Code (or open `/mcp` to reload) after editing `mcp.json`.
+Just ask Claude naturally:
 
-### 4. Verify the connection
+```
+"What does my pipeline look like?"
+"Show me all my P1 applications"
+"Update the Stripe application — set priority to P1 and salary to $200k-$220k"
+"I just got an offer from Acme: $185k base, $20k bonus, $300k equity, respond by April 10"
+"Mark my last Google interview as completed — it went well, next steps TBD"
+```
 
-In Claude Code, run `/mcp` — you should see `job-tracker` listed as connected.
+Claude will call the appropriate MCP tool and confirm what was changed.
 
 ## Available Tools
 
@@ -66,37 +58,14 @@ In Claude Code, run `/mcp` — you should see `job-tracker` listed as connected.
 | `get_dashboard` | Pipeline summary: totals by status/priority, recent activity, upcoming interviews |
 | `list_applications` | List applications, optionally filtered by status or priority |
 | `add_application` | Add a new application; creates the company automatically if needed |
-| `update_application` | Update status, priority, notes, or date applied |
+| `update_application` | Update status, priority, role, salary, location, hiring manager, dates, notes, and more |
 | `log_interaction` | Record an email, call, meeting, or LinkedIn message |
 | `list_interactions` | Show all interactions for an application |
 | `schedule_interview` | Add an interview with type, date, interviewer, and meeting link |
+| `update_interview` | Mark an interview complete, reschedule it, or add debrief notes |
 | `get_upcoming_interviews` | List interviews scheduled in the future |
 | `compare_offers` | Side-by-side comparison of all offers (comp, equity, benefits) |
-
-## Usage Examples
-
-```
-"What does my pipeline look like?"
-→ calls get_dashboard
-
-"Show me all my P1 applications"
-→ calls list_applications with priority=P1
-
-"Add Stripe, Staff Engineer, P1, applied today via LinkedIn"
-→ calls add_application (creates Stripe company if needed), then update_application
-
-"I just had a call with the Google recruiter — Sarah Chen. She said they're moving fast."
-→ calls log_interaction with type=call, contact_person="Sarah Chen", summary=...
-
-"Schedule a technical interview for my Stripe application, next Thursday at 2pm with meet.google.com/abc-xyz"
-→ calls schedule_interview
-
-"Mark my Acme application as closed"
-→ calls update_application with status=Closed
-
-"Compare all my offers"
-→ calls compare_offers
-```
+| `create_offer` | Record a new offer with full compensation details |
 
 ## Application Statuses
 
@@ -120,26 +89,26 @@ In Claude Code, run `/mcp` — you should see `job-tracker` listed as connected.
 
 ## Troubleshooting
 
-**"Error: container not running"**
-The Docker container must be running. Start it with `docker compose up -d`.
-
 **MCP server not showing up in `/mcp`**
-- Check that `~/.claude/mcp.json` is valid JSON
-- Verify the container name matches: `docker ps | grep job-search-tracker`
-- Restart Claude Code after editing the config
+- Make sure the container is running: `docker compose up -d`
+- Verify port 3000 is reachable: `curl http://localhost:3000/sse` (should stream an endpoint event)
+- Reload the MCP config: open `/mcp` in Claude Code
 
 **"Error fetching dashboard" or similar API errors**
-The FastAPI server inside the container may still be starting up. Wait a few seconds and try again. Check container health with `docker compose ps`.
+The FastAPI server may still be starting. Wait a few seconds and retry. Check health: `docker compose ps`.
 
 **Rebuilding after changes to `mcp-server/`**
 ```bash
-docker compose build
-docker compose up -d
+docker compose up --build -d
 ```
 Cargo caches layers in Docker, so only changed crates recompile.
 
 ## Implementation Notes
 
-The server is written in Rust using the [`rmcp`](https://crates.io/crates/rmcp) crate (the official Rust MCP SDK). Source is in `mcp-server/src/main.rs`. It's a straightforward HTTP client over the existing REST API — no direct database access.
+The server is written in Rust using the [`rmcp`](https://crates.io/crates/rmcp) crate (the official Rust MCP SDK). Source is in `mcp-server/src/main.rs`. Transport is SSE (`SseServer` from `rmcp::transport::sse_server`), binding to `0.0.0.0:3000` (configurable via `MCP_PORT` env var).
 
-To add a new tool, define a parameter struct with `serde::Deserialize` and `schemars::JsonSchema`, then add an `async fn` annotated with `#[tool(description = "...")]` to the `#[tool_router]` impl block in `main.rs`.
+To add a new tool:
+1. Define a parameter struct with `#[derive(Debug, Deserialize, schemars::JsonSchema)]` and `/// doc comments` on each field (these become the JSON Schema descriptions Claude sees)
+2. Add an `async fn` annotated with `#[tool(description = "...")]` to the `#[tool_router] impl JobTrackerServer` block
+3. Call `self.api_get(path)`, `self.api_post(path, body)`, or `self.api_put(path, body)` as needed
+4. Rebuild: `docker compose up --build -d`
