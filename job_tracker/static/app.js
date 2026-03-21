@@ -6,12 +6,15 @@ let sortColumn = null;
 let sortDirection = 'asc';
 let showClosedApps = false;
 let statusFilter = null;  // Track active status filter
+let columnFilters = {};   // Track per-column text filters (string for plain inputs, array for tag inputs)
+let tagFilters = {};      // Track Tom Select instances keyed by col name
 
 document.addEventListener('DOMContentLoaded', async () => {
     loadDashboard();
     await loadCompanies();
-    loadApplications();
+    await loadApplications();
     setupEventListeners();
+    setupTagFilters();
     setupModalClickOutside();
     setupSortableHeaders();
 });
@@ -43,10 +46,55 @@ function setupEventListeners() {
         updateApplicationList();
     });
 
+    // Plain text column filters
+    document.querySelectorAll('.col-filter').forEach(input => {
+        input.addEventListener('input', (e) => {
+            const col = e.target.dataset.col;
+            columnFilters[col] = e.target.value.trim().toLowerCase();
+            updateApplicationList();
+        });
+        // Prevent clicks on filter inputs from bubbling to sort headers
+        input.addEventListener('click', (e) => e.stopPropagation());
+    });
+
     document.querySelectorAll('.close-modal').forEach(btn => {
         btn.addEventListener('click', () => {
             closeModal(btn.closest('.modal').id);
         });
+    });
+}
+
+function setupTagFilters() {
+    const STATUS_OPTIONS = ['Pipeline', 'Applied', 'Screening', 'Interview', 'Offer', 'Closed', 'Rejected', 'Withdrawn', 'Accepted'];
+
+    const tsConfig = (col, options, create) => ({
+        plugins: ['remove_button'],
+        maxItems: null,
+        create,
+        placeholder: 'Filter…',
+        options: options.map(v => ({ value: v, text: v })),
+        onChange(values) {
+            tagFilters[col] = values;
+            updateApplicationList();
+        },
+        onItemAdd() { this.setTextboxValue(''); this.refreshOptions(); },
+    });
+
+    const companyNames = [...new Set(companies.map(c => c.name))].sort();
+    const roleNames    = [...new Set(applications.map(a => a.role).filter(Boolean))].sort();
+
+    tagFilters['company'] = [];
+    tagFilters['role']    = [];
+    tagFilters['status']  = [];
+
+    new TomSelect('#filter-company', tsConfig('company', companyNames, true));
+    new TomSelect('#filter-role',    tsConfig('role',    roleNames,    true));
+    new TomSelect('#filter-status',  tsConfig('status',  STATUS_OPTIONS, false));
+
+    // Prevent clicks inside tag filters from bubbling to sort headers
+    ['filter-company', 'filter-role', 'filter-status'].forEach(id => {
+        document.getElementById(id)?.closest('th')
+            ?.addEventListener('click', e => e.stopPropagation());
     });
 }
 
@@ -322,6 +370,41 @@ function updateApplicationList() {
             filteredApps = filteredApps.filter(app => app.status === statusFilter);
         }
     }
+
+    // Apply tag filters (company, role, status) — OR within column, AND across columns
+    Object.entries(tagFilters).forEach(([col, tags]) => {
+        if (!tags || tags.length === 0) return;
+        filteredApps = filteredApps.filter(app => {
+            let value = '';
+            if (col === 'company') {
+                const c = companies.find(c => c.id === app.company_id);
+                value = c ? c.name : '';
+            } else if (col === 'role') {
+                value = app.role || '';
+            } else if (col === 'status') {
+                value = app.status || '';
+            }
+            return tags.some(tag => value.toLowerCase().includes(tag.toLowerCase()));
+        });
+    });
+
+    // Apply plain text column filters
+    Object.entries(columnFilters).forEach(([col, term]) => {
+        if (!term) return;
+        filteredApps = filteredApps.filter(app => {
+            let value = '';
+            if (col === 'match_score') {
+                value = app.match_score != null ? String(app.match_score) : '';
+            } else if (col === 'priority') {
+                value = app.priority || '';
+            } else if (col === 'salary') {
+                value = app.salary_range || '';
+            } else if (col === 'date') {
+                value = app.date_applied ? new Date(app.date_applied).toLocaleDateString() : '';
+            }
+            return value.toLowerCase().includes(term);
+        });
+    });
     
     if (filteredApps.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8">No applications to display</td></tr>';
@@ -542,7 +625,15 @@ async function handleApplicationSubmit(e) {
         if (response.ok) {
             const result = await response.json();
             closeModal('applicationModal');
-            loadApplications();
+            if (currentApplication) {
+                // Edit: patch in-place to preserve scroll/sort position
+                const idx = applications.findIndex(a => a.id === result.id);
+                if (idx !== -1) applications[idx] = result;
+                updateApplicationList();
+            } else {
+                // New application: full reload to include it
+                await loadApplications();
+            }
             loadDashboard();
             
             // If status changed to a closed status, show helpful message
@@ -943,6 +1034,7 @@ function resetScoringModal() {
     document.getElementById('parseStatus').style.display = 'none';
     document.getElementById('scoringPrompt').value = '';
     document.getElementById('aiResponse').value = '';
+    document.getElementById('rescoreCheckbox').checked = false;
 }
 
 // Generate Prompt button

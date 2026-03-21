@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 import os
 import io
 import csv
+import re
 import shutil
 
 from . import crud, models
@@ -29,6 +30,28 @@ templates = Jinja2Templates(directory="job_tracker/templates")
 # Base directory for applications
 DATA_DIR = os.environ.get('DATA_DIR', '.')
 APPLICATIONS_DIR = Path(DATA_DIR) / "applications"
+
+
+def fetch_with_playwright(url: str) -> str:
+    """Fetch a JS-rendered page using headless Chromium. Returns HTML string, or empty string on failure."""
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(url, wait_until='networkidle', timeout=30000)
+            html = page.content()
+            browser.close()
+        return html
+    except Exception as e:
+        print(f"Playwright fallback failed for {url}: {e}")
+        return ""
+
+
+def make_dir_name(company: str, role: str) -> str:
+    """Canonical directory name for an application. Keeps commas, collapses runs of underscores."""
+    name = f"{company}_{role}".replace(' ', '_').replace('/', '_')
+    return re.sub(r'_+', '_', name)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -117,14 +140,14 @@ def update_application(
     existing = crud.get_application(db, application_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Application not found")
-    old_dir = APPLICATIONS_DIR / f"{existing.company.name.replace(' ', '_')}_{existing.role.replace(' ', '_').replace('/', '_')}"
+    old_dir = APPLICATIONS_DIR / make_dir_name(existing.company.name, existing.role)
 
     updated = crud.update_application(db, application_id, application)
     if not updated:
         raise HTTPException(status_code=404, detail="Application not found")
 
     # Rename directory if company or role changed
-    new_dir = APPLICATIONS_DIR / f"{updated.company.name.replace(' ', '_')}_{updated.role.replace(' ', '_').replace('/', '_')}"
+    new_dir = APPLICATIONS_DIR / make_dir_name(updated.company.name, updated.role)
     if old_dir != new_dir and old_dir.exists() and not new_dir.exists():
         old_dir.rename(new_dir)
 
@@ -241,10 +264,7 @@ def list_application_pdfs(application_id: int, db: Session = Depends(get_db)):
         # Try to construct directory name from company and role
         company = application.company
         if company:
-            dir_name_str = f"{company.name}_{application.role}".replace(' ', '_')
-            # Remove special characters that might have been sanitized
-            dir_name_str = ''.join(c if c.isalnum() or c in ['_', '-'] else '_' for c in dir_name_str)
-            dir_name = Path(dir_name_str)
+            dir_name = Path(make_dir_name(company.name, application.role))
     
     if not dir_name:
         return {"pdfs": []}
@@ -287,8 +307,7 @@ async def upload_application_file(
     else:
         # Create a directory name based on company and role
         company = application.company
-        dir_name_str = f"{company.name}_{application.role}".replace(' ', '_')
-        dir_name = Path(dir_name_str)
+        dir_name = Path(make_dir_name(company.name, application.role))
     
     app_dir = APPLICATIONS_DIR / dir_name
     app_dir.mkdir(parents=True, exist_ok=True)
@@ -754,9 +773,7 @@ def bulk_score_applications(request: BulkScoreRequest, db: Session = Depends(get
     app_data = []
     for app in applications:
         # Get application directory
-        company_name = app.company.name.replace(' ', '_')
-        role = app.role.replace(' ', '_').replace('/', '_')
-        app_dir = APPLICATIONS_DIR / f"{company_name}_{role}"
+        app_dir = APPLICATIONS_DIR / make_dir_name(app.company.name, app.role)
         job_desc_path = app_dir / "job_description.txt"
         
         # Load job description if exists
@@ -873,9 +890,7 @@ def score_single_application(application_id: int, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Application not found")
     
     # Get job description
-    company_name = application.company.name.replace(' ', '_')
-    role = application.role.replace(' ', '_').replace('/', '_')
-    app_dir = APPLICATIONS_DIR / f"{company_name}_{role}"
+    app_dir = APPLICATIONS_DIR / make_dir_name(application.company.name, application.role)
     job_desc_path = app_dir / "job_description.txt"
     
     job_description = ""
@@ -914,7 +929,6 @@ def bulk_import_applications(urls: List[str] = Body(..., embed=True), db: Sessio
     Validates URLs and skips LinkedIn job posting URLs.
     Creates application entries and directories for valid URLs.
     """
-    import re
     import urllib.request
     from bs4 import BeautifulSoup
     
@@ -1048,9 +1062,7 @@ def bulk_import_applications(urls: List[str] = Body(..., embed=True), db: Sessio
                 company = crud.create_company(db, models.CompanyCreate(name=company_name))
             
             # Create application directory
-            company_name_clean = company_name.replace(' ', '_')
-            role_clean = role.replace(' ', '_').replace('/', '_')
-            app_dir = APPLICATIONS_DIR / f"{company_name_clean}_{role_clean}"
+            app_dir = APPLICATIONS_DIR / make_dir_name(company_name, role)
             app_dir.mkdir(parents=True, exist_ok=True)
 
             # Extract main content from the page
@@ -1082,6 +1094,34 @@ def bulk_import_applications(urls: List[str] = Body(..., embed=True), db: Sessio
                 keyword_hits = sum(1 for kw in job_keywords if kw in job_content.lower())
                 if keyword_hits < 3:
                     job_content = ""
+
+            # If content looks like JS-rendered nav/shell, retry with Playwright
+            if not job_content:
+                pw_html = fetch_with_playwright(url)
+                if pw_html:
+                    pw_soup = BeautifulSoup(pw_html, 'html.parser')
+                    # Re-extract title/role from rendered page if we got "Unknown Role"
+                    if role in ("Unknown Role", ""):
+                        pw_title = pw_soup.find('title')
+                        if pw_title:
+                            role = re.sub(r'\s*[-|]\s*.*$', '', pw_title.get_text().strip())[:100]
+                    for selector in ['article', 'main', '.job-description', '#job-description',
+                                     '.description', '[class*="description"]', '[class*="job"]']:
+                        elem = pw_soup.select_one(selector)
+                        if elem:
+                            text = elem.get_text(separator='\n', strip=True)
+                            if len(text) > 200:
+                                job_content = text
+                                break
+                    if not job_content:
+                        body = pw_soup.find('body')
+                        if body:
+                            job_content = body.get_text(separator='\n', strip=True)
+                    # Final quality check on Playwright content
+                    if job_content:
+                        keyword_hits = sum(1 for kw in job_keywords if kw in job_content.lower())
+                        if keyword_hits < 3:
+                            job_content = ""
 
             # Try to extract salary range from content
             salary_range = None

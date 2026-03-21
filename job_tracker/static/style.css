@@ -431,6 +431,132 @@ th.sortable:hover .sort-icon {
     opacity: 1;
 }
 
+.filter-row th {
+    padding: 4px 8px;
+    background: var(--bg-tertiary);
+}
+
+.filter-row input {
+    width: 100%;
+    padding: 4px 8px;
+    font-size: 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    box-sizing: border-box;
+}
+
+.filter-row input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+/* ── Tom Select theme overrides ─────────────────────────────────────────── */
+.filter-row .ts-wrapper {
+    min-width: 0;
+}
+
+.filter-row .ts-control {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 12px;
+    color: var(--text-primary);
+    min-height: 28px;
+    box-shadow: none;
+    flex-wrap: wrap;
+    gap: 3px;
+    overflow: hidden;
+}
+
+.filter-row .ts-control:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: none;
+}
+
+.filter-row .ts-control input {
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 12px;
+    padding: 1px 2px;
+    min-width: 60px;
+    box-sizing: border-box;
+}
+
+.filter-row .ts-control input::placeholder {
+    color: var(--text-tertiary);
+}
+
+.filter-row .ts-control .item {
+    background: rgba(38, 139, 210, 0.15);
+    color: var(--sol-blue);
+    border: 1px solid rgba(38, 139, 210, 0.3);
+    border-radius: 10px;
+    padding: 1px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.filter-row .ts-control .item .remove {
+    color: var(--sol-blue);
+    opacity: 0.6;
+    font-size: 13px;
+    line-height: 1;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+}
+
+.filter-row .ts-control .item .remove:hover {
+    opacity: 1;
+    color: var(--sol-red);
+}
+
+.filter-row .ts-dropdown {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--text-primary);
+    box-shadow: var(--shadow-md);
+    z-index: 100;
+}
+
+.filter-row .ts-dropdown-content {
+    scrollbar-width: none;
+}
+
+.filter-row .ts-dropdown-content::-webkit-scrollbar {
+    display: none;
+}
+
+.filter-row .ts-dropdown .option {
+    padding: 6px 10px;
+    color: var(--text-primary);
+}
+
+.filter-row .ts-dropdown .option:hover,
+.filter-row .ts-dropdown .option.active {
+    background: var(--bg-tertiary);
+    color: var(--primary-color);
+}
+
+.filter-row .ts-dropdown .create {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.filter-row .ts-dropdown .create:hover {
+    background: var(--bg-tertiary);
+    color: var(--primary-color);
+}
+
 .fa-sort-up,
 .fa-sort-down {
     opacity: 1;

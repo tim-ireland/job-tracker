@@ -6,6 +6,8 @@
     <title>Job Application Tracker</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 </head>
 <body>
     <button class="theme-toggle" id="themeToggle">
@@ -132,6 +134,16 @@
                                 <i class="fas fa-sort sort-icon"></i>
                             </th>
                             <th><i class="fas fa-cog"></i> Actions</th>
+                        </tr>
+                        <tr class="filter-row">
+                            <th><select id="filter-company" multiple placeholder="Filter…"></select></th>
+                            <th><select id="filter-role" multiple placeholder="Filter…"></select></th>
+                            <th><input type="text" class="col-filter" data-col="match_score" placeholder="Filter…"></th>
+                            <th><input type="text" class="col-filter" data-col="priority" placeholder="Filter…"></th>
+                            <th><select id="filter-status" multiple placeholder="Filter…"></select></th>
+                            <th><input type="text" class="col-filter" data-col="salary" placeholder="Filter…"></th>
+                            <th><input type="text" class="col-filter" data-col="date" placeholder="Filter…"></th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody id="applicationTableBody">
