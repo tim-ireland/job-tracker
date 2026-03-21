@@ -2,6 +2,8 @@
 
 A comprehensive web-based job application tracking system with LaTeX resume generation, built with FastAPI and Docker.
 
+<img width="1512" height="1407" alt=" Job Application Tracker" src="https://github.com/user-attachments/assets/34d26ada-3675-4d26-9b28-acdd428d3498" />
+
 ## Features
 
 - 📊 **Track Applications**: Manage job applications with status tracking, priorities, and deadlines
