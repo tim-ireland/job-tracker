@@ -904,7 +904,7 @@ if (duaWeekStartInput) {
 
 async function loadDUAReport(weekStart) {
     try {
-        const response = await fetch(`${API_BASE}/reports/dua-weekly?week_start=${weekStart}`);
+        const response = await fetch(`${API_BASE}/reports/activity-weekly?week_start=${weekStart}`);
         const report = await response.text();
         
         currentDUAReport = report;
@@ -937,7 +937,7 @@ function downloadDUAReport() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `MA_DUA_Activity_${currentDUAWeekStart}.txt`;
+    a.download = `activity_log_${currentDUAWeekStart}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

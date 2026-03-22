@@ -432,115 +432,74 @@ def import_job_urls(request: ImportJobsRequest, db: Session = Depends(get_db)):
     }
 
 
-# MA DUA Weekly Activity Report
-@app.get("/api/reports/dua-weekly", response_class=PlainTextResponse)
-def get_dua_weekly_report(week_start: Optional[str] = None, db: Session = Depends(get_db)):
+# Activity Log - Weekly Report
+@app.get("/api/reports/activity-weekly", response_class=PlainTextResponse)
+def get_activity_weekly_report(week_start: Optional[str] = None, db: Session = Depends(get_db)):
     """
-    Generate Massachusetts DUA weekly activity report
-    Week runs Sunday through Saturday
-    Format: "Date: Position Pay rate Employer name and address Job ID or person contacted Contact email, website, or phone Result"
+    Generate weekly job search activity report.
+    Week runs Sunday through Saturday.
     """
-    # Parse or calculate week start (Sunday)
     if week_start:
         start_date = datetime.strptime(week_start, '%Y-%m-%d')
     else:
-        # Default to previous week starting last Sunday
         today = datetime.now()
         days_since_sunday = (today.weekday() + 1) % 7
         start_date = today - timedelta(days=days_since_sunday + 7)
-    
-    # Ensure start_date is a Sunday (weekday 6 in Python)
+
     if start_date.weekday() != 6:
         days_since_sunday = (start_date.weekday() + 1) % 7
         start_date = start_date - timedelta(days=days_since_sunday)
-    
+
     start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
     end_date = start_date + timedelta(days=6, hours=23, minutes=59, seconds=59)
-    
-    # Get all activity for the week using the new crud function
+
     activities = crud.get_weekly_activity(db, start_date, end_date)
-    
-    # Format report
+
     report_lines = []
     report_lines.append(f"Week starting Sunday {start_date.strftime('%m/%d/%Y')} through Saturday {end_date.strftime('%m/%d/%Y')}:\n")
-    
+
     if not activities:
         report_lines.append("No job search activities recorded for this week.\n")
     else:
         for activity in activities:
-            # Date
             date_str = activity['date'].strftime('%m/%d/%Y')
-            
-            # Position
-            position = activity['position']
-            
-            # Pay rate
-            pay_rate = activity['pay_rate']
-            
-            # Employer name and address
-            employer_name = activity['employer_name']
-            employer_address = activity['employer_address']
-            employer_info = employer_name
-            if employer_address:
-                employer_info += f" {employer_address}"
-            
-            # Job ID or person contacted
-            job_id = activity['job_id']
-            contact_person = activity['contact_person']
-            person_or_id = contact_person if contact_person else job_id
-            
-            # Contact email, website, or phone
-            contact_info = activity['contact_email'] if activity['contact_email'] else employer_address
-            
-            # Result
-            result = activity['result']
-            
-            # Format line per MA DUA requirements
-            line = f"{date_str}: {position} {pay_rate} {employer_info} {person_or_id} {contact_info} {result}"
+            employer_info = activity['employer_name']
+            if activity['employer_address']:
+                employer_info += f" {activity['employer_address']}"
+            person_or_id = activity['contact_person'] if activity['contact_person'] else activity['job_id']
+            contact_info = activity['contact_email'] if activity['contact_email'] else activity['employer_address']
+            line = f"{date_str}: {activity['position']} {activity['pay_rate']} {employer_info} {person_or_id} {contact_info} {activity['result']}"
             report_lines.append(line)
-    
+
     return "\n".join(report_lines)
 
 
-@app.get("/api/reports/dua-weekly-csv")
-def get_dua_weekly_report_csv(week_start: Optional[str] = None, db: Session = Depends(get_db)):
-    """
-    Generate Massachusetts DUA weekly activity report in CSV format
-    Week runs Sunday through Saturday
-    """
-    # Parse or calculate week start (Sunday)
+@app.get("/api/reports/activity-weekly-csv")
+def get_activity_weekly_report_csv(week_start: Optional[str] = None, db: Session = Depends(get_db)):
+    """Generate weekly job search activity report in CSV format."""
     if week_start:
         start_date = datetime.strptime(week_start, '%Y-%m-%d')
     else:
-        # Default to previous week starting last Sunday
         today = datetime.now()
         days_since_sunday = (today.weekday() + 1) % 7
         start_date = today - timedelta(days=days_since_sunday + 7)
-    
-    # Ensure start_date is a Sunday (weekday 6 in Python)
+
     if start_date.weekday() != 6:
         days_since_sunday = (start_date.weekday() + 1) % 7
         start_date = start_date - timedelta(days=days_since_sunday)
-    
+
     start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
     end_date = start_date + timedelta(days=6, hours=23, minutes=59, seconds=59)
-    
-    # Get all activity for the week
+
     activities = crud.get_weekly_activity(db, start_date, end_date)
-    
-    # Create CSV in memory
+
     output = io.StringIO()
     writer = csv.writer(output)
-    
-    # Write header with week range
     writer.writerow([f"Week starting Sunday {start_date.strftime('%m/%d/%Y')} through Saturday {end_date.strftime('%m/%d/%Y')}"])
-    writer.writerow([])  # Empty row
-    
-    # Write column headers
-    writer.writerow(['Date', 'Position', 'Pay Rate', 'Employer Name', 'Employer Address', 
+    writer.writerow([])
+    writer.writerow(['Date', 'Position', 'Pay Rate', 'Employer Name', 'Employer Address',
                      'Job ID or Person Contacted', 'Contact Email/Website/Phone', 'Result'])
-    
-    # Write data
+
     if not activities:
         writer.writerow(['No job search activities recorded for this week'])
     else:
@@ -555,24 +514,22 @@ def get_dua_weekly_report_csv(week_start: Optional[str] = None, db: Session = De
                 activity['contact_email'] if activity['contact_email'] else activity['employer_address'],
                 activity['result']
             ])
-    
-    # Return as streaming response
+
     output.seek(0)
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
         headers={
-            "Content-Disposition": f"attachment; filename=dua_weekly_{start_date.strftime('%Y%m%d')}.csv"
+            "Content-Disposition": f"attachment; filename=activity_weekly_{start_date.strftime('%Y%m%d')}.csv"
         }
     )
 
 
-@app.get("/api/reports/dua-range", response_class=PlainTextResponse)
-def get_dua_range_report(start_date: str, end_date: str, db: Session = Depends(get_db)):
+@app.get("/api/reports/activity-range", response_class=PlainTextResponse)
+def get_activity_range_report(start_date: str, end_date: str, db: Session = Depends(get_db)):
     """
-    Generate Massachusetts DUA activity report for a custom date range
-    Breaks down by week (Sunday-Saturday)
-    
+    Generate job search activity report for a custom date range, broken down by week.
+
     Parameters:
     - start_date: ISO format YYYY-MM-DD
     - end_date: ISO format YYYY-MM-DD
@@ -582,79 +539,63 @@ def get_dua_range_report(start_date: str, end_date: str, db: Session = Depends(g
         end = datetime.strptime(end_date, '%Y-%m-%d')
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-    
+
     if start > end:
         raise HTTPException(status_code=400, detail="Start date must be before end date")
-    
-    # Find the Sunday before or on start_date
+
     days_since_sunday = (start.weekday() + 1) % 7
     week_start = start - timedelta(days=days_since_sunday)
     week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
-    
+
     report_lines = []
-    report_lines.append(f"Massachusetts DUA Activity Report")
+    report_lines.append("Job Search Activity Report")
     report_lines.append(f"Date Range: {start.strftime('%m/%d/%Y')} through {end.strftime('%m/%d/%Y')}")
     report_lines.append("=" * 80)
     report_lines.append("")
-    
+
     total_activities = 0
-    
-    # Process each week
     current_week_start = week_start
     while current_week_start <= end:
         week_end = current_week_start + timedelta(days=6, hours=23, minutes=59, seconds=59)
-        
-        # Get activities for this week
         activities = crud.get_weekly_activity(db, current_week_start, week_end)
-        
-        # Only show weeks that overlap with the requested range
+
         if current_week_start <= end and week_end >= start:
             report_lines.append(f"\nWeek starting Sunday {current_week_start.strftime('%m/%d/%Y')} through Saturday {week_end.strftime('%m/%d/%Y')}:")
             report_lines.append("-" * 80)
-            
+
             if not activities:
                 report_lines.append("No job search activities recorded for this week.")
             else:
                 week_count = 0
                 for activity in activities:
-                    # Only include activities within the requested range
                     if start <= activity['date'] <= end:
-                        date_str = activity['date'].strftime('%m/%d/%Y')
-                        position = activity['position']
-                        pay_rate = activity['pay_rate']
-                        employer_name = activity['employer_name']
-                        employer_address = activity['employer_address']
-                        employer_info = employer_name
-                        if employer_address:
-                            employer_info += f" {employer_address}"
-                        
+                        employer_info = activity['employer_name']
+                        if activity['employer_address']:
+                            employer_info += f" {activity['employer_address']}"
                         person_or_id = activity['contact_person'] if activity['contact_person'] else activity['job_id']
-                        contact_info = activity['contact_email'] if activity['contact_email'] else employer_address
-                        result = activity['result']
-                        
-                        line = f"{date_str}: {position} {pay_rate} {employer_info} {person_or_id} {contact_info} {result}"
+                        contact_info = activity['contact_email'] if activity['contact_email'] else activity['employer_address']
+                        line = f"{activity['date'].strftime('%m/%d/%Y')}: {activity['position']} {activity['pay_rate']} {employer_info} {person_or_id} {contact_info} {activity['result']}"
                         report_lines.append(line)
                         week_count += 1
                         total_activities += 1
-                
+
                 if week_count == 0:
                     report_lines.append("No job search activities recorded for this week.")
-        
-        # Move to next week
+
         current_week_start += timedelta(days=7)
-    
+
     report_lines.append("")
     report_lines.append("=" * 80)
     report_lines.append(f"Total activities recorded: {total_activities}")
-    
+
     return "\n".join(report_lines)
 
 
-@app.get("/api/reports/dua-range-csv")
-def get_dua_range_report_csv(start_date: str, end_date: str, db: Session = Depends(get_db)):
+@app.get("/api/reports/activity-range-csv")
+def get_activity_range_report_csv(start_date: str, end_date: str, db: Session = Depends(get_db)):
     """
-    Generate Massachusetts DUA activity report for a custom date range in CSV format
-    
+    Generate job search activity report for a custom date range in CSV format.
+
     Parameters:
     - start_date: ISO format YYYY-MM-DD
     - end_date: ISO format YYYY-MM-DD
@@ -664,44 +605,34 @@ def get_dua_range_report_csv(start_date: str, end_date: str, db: Session = Depen
         end = datetime.strptime(end_date, '%Y-%m-%d')
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-    
+
     if start > end:
         raise HTTPException(status_code=400, detail="Start date must be before end date")
-    
-    # Find the Sunday before or on start_date
+
     days_since_sunday = (start.weekday() + 1) % 7
     week_start = start - timedelta(days=days_since_sunday)
     week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
-    
-    # Create CSV in memory
+
     output = io.StringIO()
     writer = csv.writer(output)
-    
-    # Write header
-    writer.writerow([f"Massachusetts DUA Activity Report"])
+    writer.writerow(["Job Search Activity Report"])
     writer.writerow([f"Date Range: {start.strftime('%m/%d/%Y')} through {end.strftime('%m/%d/%Y')}"])
     writer.writerow([])
-    
-    # Process each week
+
     current_week_start = week_start
     while current_week_start <= end:
         week_end = current_week_start + timedelta(days=6, hours=23, minutes=59, seconds=59)
-        
-        # Get activities for this week
         activities = crud.get_weekly_activity(db, current_week_start, week_end)
-        
-        # Only show weeks that overlap with the requested range
+
         if current_week_start <= end and week_end >= start:
-            # Write week header
             writer.writerow([f"Week starting Sunday {current_week_start.strftime('%m/%d/%Y')} through Saturday {week_end.strftime('%m/%d/%Y')}"])
-            writer.writerow(['Date', 'Position', 'Pay Rate', 'Employer Name', 'Employer Address', 
-                           'Job ID or Person Contacted', 'Contact Email/Website/Phone', 'Result'])
-            
+            writer.writerow(['Date', 'Position', 'Pay Rate', 'Employer Name', 'Employer Address',
+                             'Job ID or Person Contacted', 'Contact Email/Website/Phone', 'Result'])
+
             if not activities:
                 writer.writerow(['No job search activities recorded for this week'])
             else:
                 for activity in activities:
-                    # Only include activities within the requested range
                     if start <= activity['date'] <= end:
                         writer.writerow([
                             activity['date'].strftime('%m/%d/%Y'),
@@ -713,21 +644,54 @@ def get_dua_range_report_csv(start_date: str, end_date: str, db: Session = Depen
                             activity['contact_email'] if activity['contact_email'] else activity['employer_address'],
                             activity['result']
                         ])
-            
-            writer.writerow([])  # Empty row between weeks
-        
-        # Move to next week
+
+            writer.writerow([])
+
         current_week_start += timedelta(days=7)
-    
-    # Return as streaming response
+
     output.seek(0)
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
         headers={
-            "Content-Disposition": f"attachment; filename=dua_range_{start.strftime('%Y%m%d')}_{end.strftime('%Y%m%d')}.csv"
+            "Content-Disposition": f"attachment; filename=activity_range_{start.strftime('%Y%m%d')}_{end.strftime('%Y%m%d')}.csv"
         }
     )
+
+
+# Deprecated routes — redirect to new activity-* equivalents
+@app.get("/api/reports/dua-weekly", response_class=PlainTextResponse, include_in_schema=False)
+def get_dua_weekly_report(week_start: Optional[str] = None, db: Session = Depends(get_db)):
+    """Deprecated: use /api/reports/activity-weekly"""
+    from fastapi.responses import RedirectResponse
+    url = "/api/reports/activity-weekly"
+    if week_start:
+        url += f"?week_start={week_start}"
+    return RedirectResponse(url=url, status_code=301)
+
+
+@app.get("/api/reports/dua-weekly-csv", include_in_schema=False)
+def get_dua_weekly_report_csv(week_start: Optional[str] = None, db: Session = Depends(get_db)):
+    """Deprecated: use /api/reports/activity-weekly-csv"""
+    from fastapi.responses import RedirectResponse
+    url = "/api/reports/activity-weekly-csv"
+    if week_start:
+        url += f"?week_start={week_start}"
+    return RedirectResponse(url=url, status_code=301)
+
+
+@app.get("/api/reports/dua-range", response_class=PlainTextResponse, include_in_schema=False)
+def get_dua_range_report(start_date: str, end_date: str, db: Session = Depends(get_db)):
+    """Deprecated: use /api/reports/activity-range"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=f"/api/reports/activity-range?start_date={start_date}&end_date={end_date}", status_code=301)
+
+
+@app.get("/api/reports/dua-range-csv", include_in_schema=False)
+def get_dua_range_report_csv(start_date: str, end_date: str, db: Session = Depends(get_db)):
+    """Deprecated: use /api/reports/activity-range-csv"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=f"/api/reports/activity-range-csv?start_date={start_date}&end_date={end_date}", status_code=301)
 
 
 # ==================== BULK JOB SCORING ENDPOINTS ====================
