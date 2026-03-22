@@ -160,9 +160,34 @@ def update_application(
 
 @app.delete("/api/applications/{application_id}")
 def delete_application(application_id: int, db: Session = Depends(get_db)):
-    if not crud.delete_application(db, application_id):
+    application = crud.get_application(db, application_id)
+    if not application:
         raise HTTPException(status_code=404, detail="Application not found")
-    return {"message": "Application deleted"}
+
+    company = crud.get_company(db, application.company_id)
+    company_name = company.name if company else ""
+
+    # Try both naming conventions (Python web UI keeps commas; shell script replaces them)
+    dir_deleted = False
+    for candidate in [make_dir_name(company_name, application.role),
+                      re.sub(r'[^a-zA-Z0-9_-]', '_', f"{company_name}_{application.role}")]:
+        candidate_path = APPLICATIONS_DIR / candidate
+        if candidate_path.exists() and candidate_path.is_dir():
+            # Only delete the directory if no other application maps to the same path
+            other_apps = [
+                a for a in crud.get_applications(db)
+                if a.id != application_id and (
+                    make_dir_name(company_name, a.role) == candidate or
+                    re.sub(r'[^a-zA-Z0-9_-]', '_', f"{company_name}_{a.role}") == candidate
+                )
+            ]
+            if not other_apps:
+                shutil.rmtree(candidate_path)
+                dir_deleted = True
+            break
+
+    crud.delete_application(db, application_id)
+    return {"message": "Application deleted", "directory_deleted": dir_deleted}
 
 
 @app.get("/api/contacts", response_model=List[models.Contact])
