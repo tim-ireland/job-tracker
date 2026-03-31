@@ -6,16 +6,16 @@ A comprehensive web-based job application tracking system with LaTeX resume gene
 
 ## Features
 
-- 📊 **Track Applications**: Manage job applications with status tracking, priorities, and deadlines
-- 📝 **Resume Generation**: Generate customized LaTeX resumes and cover letters for each application
-- 📄 **PDF Management**: View and download generated PDFs directly from the web interface
-- 👥 **Company Tracking**: Maintain company information, contacts, and tech stacks
-- 📅 **Interview Scheduling**: Track interviews with dates, interviewers, and outcomes
-- 💼 **Offer Comparison**: Compare multiple job offers side-by-side
-- 📋 **MA DUA Export**: Export weekly activity reports for Massachusetts Department of Unemployment Assistance
-- 🎨 **Modern UI**: Clean, responsive interface with dark/light mode
-- 🐳 **Docker Support**: Containerized application with persistent data volumes
-- 🤖 **Claude Code MCP Server**: Drive your job search from the terminal using natural language via Claude Code
+- **Track Applications**: Manage job applications with status tracking, priorities, and deadlines
+- **Resume Generation**: Generate customized LaTeX resumes and cover letters for each application
+- **PDF Management**: View and download generated PDFs directly from the web interface
+- **Company Tracking**: Maintain company information, contacts, and tech stacks
+- **Interview Scheduling**: Track interviews with dates, interviewers, and outcomes
+- **Offer Comparison**: Compare multiple job offers side-by-side
+- **Activity Export**: Export weekly activity reports
+- **Modern UI**: Clean, responsive interface with dark/light mode
+- **Docker Support**: Containerized application with persistent data volumes
+- **Claude Code MCP Server**: Drive your job search from the terminal using natural language via Claude Code
 
 ## Quick Start
 
@@ -195,9 +195,9 @@ Once running, view the interactive API documentation at:
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
-### Weekly Activity Export (Massachusetts DUA)
+### Weekly Activity Export
 
-The toolkit includes specialized endpoints for exporting job search activity in the format required by the Massachusetts Department of Unemployment Assistance.
+The toolkit includes specialized endpoints for exporting job search activity 
 
 #### Export Previous Week (Text Format)
 ```bash
@@ -337,10 +337,10 @@ This toolkit is designed to keep your personal job search data separate from the
 
 ## Support
 
-- 📖 [Documentation](docs/)
-- 🤖 [MCP Server Setup](docs/MCP_SERVER.md)
-- 🐛 [Issue Tracker](https://github.com/yourusername/job-search-toolkit/issues)
-- 💬 [Discussions](https://github.com/yourusername/job-search-toolkit/discussions)
+- [Documentation](docs/)
+- [MCP Server Setup](docs/MCP_SERVER.md)
+- [Issue Tracker](https://github.com/yourusername/job-search-toolkit/issues)
+- [Discussions](https://github.com/yourusername/job-search-toolkit/discussions)
 
 ## Acknowledgments
 
