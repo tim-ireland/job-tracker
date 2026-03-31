@@ -337,10 +337,10 @@ This toolkit is designed to keep your personal job search data separate from the
 
 ## Support
 
-- 📖 [Documentation](docs/)
-- 🤖 [MCP Server Setup](docs/MCP_SERVER.md)
-- 🐛 [Issue Tracker](https://github.com/yourusername/job-search-toolkit/issues)
-- 💬 [Discussions](https://github.com/yourusername/job-search-toolkit/discussions)
+- [Documentation](docs/)
+- [MCP Server Setup](docs/MCP_SERVER.md)
+- [Issue Tracker](https://github.com/yourusername/job-search-toolkit/issues)
+- [Discussions](https://github.com/yourusername/job-search-toolkit/discussions)
 
 ## Acknowledgments
 
