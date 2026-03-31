@@ -209,8 +209,10 @@ class OfferBase(BaseModel):
     signing_bonus: Optional[int] = None
     equity_value: Optional[int] = None
     equity_details: Optional[str] = None
+    vesting_schedule: Optional[str] = None
     total_comp: Optional[int] = None
     pto_days: Optional[int] = None
+    pto_unlimited: Optional[bool] = False
     sick_days: Optional[int] = None
     holidays: Optional[int] = None
     health_insurance: Optional[str] = None
@@ -235,8 +237,10 @@ class OfferUpdate(BaseModel):
     signing_bonus: Optional[int] = None
     equity_value: Optional[int] = None
     equity_details: Optional[str] = None
+    vesting_schedule: Optional[str] = None
     total_comp: Optional[int] = None
     pto_days: Optional[int] = None
+    pto_unlimited: Optional[bool] = None
     sick_days: Optional[int] = None
     holidays: Optional[int] = None
     health_insurance: Optional[str] = None

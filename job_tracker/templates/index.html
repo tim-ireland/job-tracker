@@ -751,6 +751,140 @@
         </div>
     </div>
 
+    <!-- Offer Edit Modal -->
+    <div id="offerModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2><i class="fas fa-gift"></i> Edit Offer</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <form id="offerForm" style="padding: 20px;">
+                <input type="hidden" id="offerEditId">
+
+                <h4 style="margin-bottom: 12px;"><i class="fas fa-dollar-sign"></i> Compensation</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Base Salary</label>
+                        <input type="number" id="offerBaseSalary" class="form-control" placeholder="200000">
+                    </div>
+                    <div class="form-group">
+                        <label>Bonus Target ($)</label>
+                        <input type="number" id="offerBonusTarget" class="form-control" placeholder="20000">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Signing Bonus ($)</label>
+                        <input type="number" id="offerSigningBonus" class="form-control" placeholder="10000">
+                    </div>
+                    <div class="form-group">
+                        <label>Equity Value (annual $)</label>
+                        <input type="number" id="offerEquityValue" class="form-control" placeholder="50000">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Total Comp ($)</label>
+                        <input type="number" id="offerTotalComp" class="form-control" placeholder="270000">
+                    </div>
+                    <div class="form-group">
+                        <label>401k Match</label>
+                        <input type="text" id="offerRetirementMatch" class="form-control" placeholder="e.g. 6% up to 4% contribution">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Equity Type &amp; Value</label>
+                    <input type="text" id="offerEquityDetails" class="form-control" placeholder="e.g. RSU: $5,000, ISO: $10,000, UARs: $10,000">
+                </div>
+                <div class="form-group">
+                    <label>Vesting Schedule</label>
+                    <input type="text" id="offerVestingSchedule" class="form-control" placeholder="e.g. 4 years with 1 year cliff">
+                </div>
+
+                <h4 style="margin: 16px 0 12px;"><i class="fas fa-umbrella"></i> Benefits &amp; Time Off</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>PTO Days</label>
+                        <input type="number" id="offerPtoDays" class="form-control" placeholder="15">
+                    </div>
+                    <div class="form-group" style="display:flex; align-items:center; gap:8px; padding-top:28px;">
+                        <input type="checkbox" id="offerPtoUnlimited" style="width:16px;height:16px;">
+                        <label for="offerPtoUnlimited" style="margin:0;">Unlimited PTO</label>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Sick Days</label>
+                        <input type="number" id="offerSickDays" class="form-control" placeholder="10">
+                    </div>
+                    <div class="form-group">
+                        <label>Holidays</label>
+                        <input type="number" id="offerHolidays" class="form-control" placeholder="10">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Health Insurance</label>
+                    <input type="text" id="offerHealthInsurance" class="form-control" placeholder="e.g. PPO, $0 premium">
+                </div>
+
+                <h4 style="margin: 16px 0 12px;"><i class="fas fa-briefcase"></i> Work Details</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Remote Policy</label>
+                        <select id="offerRemotePolicy" class="form-control">
+                            <option value="">Not specified</option>
+                            <option value="Remote">Remote</option>
+                            <option value="Hybrid">Hybrid</option>
+                            <option value="On-site">On-site</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <input type="date" id="offerStartDate" class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Offer Date</label>
+                        <input type="date" id="offerDate" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Response Deadline</label>
+                        <input type="date" id="offerDeadline" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Relocation Assistance</label>
+                    <input type="text" id="offerRelocation" class="form-control" placeholder="e.g. $5,000 lump sum">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="offerStatus" class="form-control">
+                            <option value="Pending">Pending</option>
+                            <option value="Negotiating">Negotiating</option>
+                            <option value="Accepted">Accepted</option>
+                            <option value="Declined">Declined</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="offerNotes" class="form-control" rows="3" placeholder="Additional notes..."></textarea>
+                </div>
+
+                <div class="flex flex-end" style="margin-top: 8px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('offerModal')">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Offer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="/static/app.js"></script>
     <script src="/static/offers.js"></script>
     <script src="/static/interviews.js"></script>

@@ -3,7 +3,7 @@ Database models for job tracking application
 """
 import os
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, text
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Boolean, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
@@ -150,11 +150,13 @@ class Offer(Base):
     bonus_target = Column(Integer)
     signing_bonus = Column(Integer)
     equity_value = Column(Integer)
-    equity_details = Column(String)
+    equity_details = Column(String)  # type/value breakdown e.g. "RSU: $5,000, ISO: $10,000"
+    vesting_schedule = Column(String)  # e.g. "4 years, 1 year cliff"
     total_comp = Column(Integer)
     
     # Benefits
     pto_days = Column(Integer)
+    pto_unlimited = Column(Boolean, default=False)
     sick_days = Column(Integer)
     holidays = Column(Integer)
     health_insurance = Column(String)
@@ -184,6 +186,13 @@ def init_db():
         cols = [row[1] for row in conn.execute(text("PRAGMA table_info(applications)")).fetchall()]
         if "personal_rank" not in cols:
             conn.execute(text("ALTER TABLE applications ADD COLUMN personal_rank INTEGER"))
+            conn.commit()
+        offer_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(offers)")).fetchall()]
+        if "pto_unlimited" not in offer_cols:
+            conn.execute(text("ALTER TABLE offers ADD COLUMN pto_unlimited BOOLEAN DEFAULT 0"))
+            conn.commit()
+        if "vesting_schedule" not in offer_cols:
+            conn.execute(text("ALTER TABLE offers ADD COLUMN vesting_schedule VARCHAR"))
             conn.commit()
 
 
