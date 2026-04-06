@@ -166,6 +166,7 @@ class Offer(Base):
     # Work Details
     start_date = Column(DateTime)
     remote_policy = Column(String)
+    commute_time = Column(String)
     relocation_assistance = Column(String)
     
     # Status
@@ -193,6 +194,9 @@ def init_db():
             conn.commit()
         if "vesting_schedule" not in offer_cols:
             conn.execute(text("ALTER TABLE offers ADD COLUMN vesting_schedule VARCHAR"))
+            conn.commit()
+        if "commute_time" not in offer_cols:
+            conn.execute(text("ALTER TABLE offers ADD COLUMN commute_time VARCHAR"))
             conn.commit()
 
 

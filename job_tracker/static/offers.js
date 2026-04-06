@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 holidays: document.getElementById('offerHolidays').value ? parseInt(document.getElementById('offerHolidays').value) : null,
                 health_insurance: document.getElementById('offerHealthInsurance').value || null,
                 remote_policy: document.getElementById('offerRemotePolicy').value || null,
+                commute_time: document.getElementById('offerCommuteTime').value || null,
                 start_date: document.getElementById('offerStartDate').value || null,
                 offer_date: document.getElementById('offerDate').value || null,
                 response_deadline: document.getElementById('offerDeadline').value || null,
@@ -177,6 +178,11 @@ function displayOffers() {
                                 <span class="label">Response Deadline:</span>
                                 <span class="value">${new Date(offer.response_deadline).toLocaleDateString()}</span>
                             </div>` : ''}
+                            ${offer.commute_time ? `
+                            <div class="offer-item">
+                                <span class="label">Commute Time:</span>
+                                <span class="value">${escapeHtml(offer.commute_time)}</span>
+                            </div>` : ''}
                             ${offer.relocation_assistance ? `
                             <div class="offer-item">
                                 <span class="label">Relocation:</span>
@@ -317,6 +323,7 @@ function editOffer(offerId) {
     document.getElementById('offerHolidays').value = offer.holidays || '';
     document.getElementById('offerHealthInsurance').value = offer.health_insurance || '';
     document.getElementById('offerRemotePolicy').value = offer.remote_policy || '';
+    document.getElementById('offerCommuteTime').value = offer.commute_time || '';
     document.getElementById('offerStartDate').value = offer.start_date ? offer.start_date.split('T')[0] : '';
     document.getElementById('offerDate').value = offer.offer_date ? offer.offer_date.split('T')[0] : '';
     document.getElementById('offerDeadline').value = offer.response_deadline ? offer.response_deadline.split('T')[0] : '';

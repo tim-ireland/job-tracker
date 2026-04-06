@@ -220,6 +220,7 @@ class OfferBase(BaseModel):
     other_benefits: Optional[str] = None
     start_date: Optional[datetime] = None
     remote_policy: Optional[str] = None
+    commute_time: Optional[str] = None
     relocation_assistance: Optional[str] = None
     status: str = "Pending"
     notes: Optional[str] = None
@@ -248,6 +249,7 @@ class OfferUpdate(BaseModel):
     other_benefits: Optional[str] = None
     start_date: Optional[datetime] = None
     remote_policy: Optional[str] = None
+    commute_time: Optional[str] = None
     relocation_assistance: Optional[str] = None
     status: Optional[str] = None
     notes: Optional[str] = None
